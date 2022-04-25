@@ -510,7 +510,7 @@ class RTDTempGUI:
         # Calculate the value of the resistor first
         R = self.convertResistanceMAX31865(value)
         # Now calculate the temperature
-        val = (R-self.R0)/(self.ALPHA*self.R0)
+        val = (R-100)/(self.ALPHA*self.R0)
         return val
     
     # Function for displaying correct labelling of the axes
