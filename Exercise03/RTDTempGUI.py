@@ -153,7 +153,7 @@ class RTDTempGUI:
         self.uiElements.append(self.timeButton)
         self.uiGridParams.append([0, 1, 1, 1, "W"])
         self.timeButton.bind("<Button-1>", self.handle_viewTimeSeries)
-        self.histAutoButton = Radiobutton(self.displaySFrame, text="Histogram (auto bins)", variable = self.viewType, value = "Histogram (auto bins)")
+        self.histAutoButton = Radiobutton(self.displaySFrame, text="Histogram (auto)", variable = self.viewType, value = "Histogram (auto)")
         self.uiElements.append(self.histAutoButton)
         self.uiGridParams.append([0, 2, 1, 1, "W"])
         self.histAutoButton.bind("<Button-1>", self.handle_viewHistogramAuto)
@@ -188,7 +188,7 @@ class RTDTempGUI:
         self.uiGridParams.append([1, 4, 1, 1, "W"])
         self.temperatureButton.bind("<Button-1>", self.handle_unitTemperature)
         # Create Label for the array size scale
-        self.sizeLabel = Label(master=self.displaySFrame, text="Number of data points")
+        self.sizeLabel = Label(master=self.displaySFrame, text="Data points")
         self.uiElements.append(self.sizeLabel)
         self.uiGridParams.append([2, 0, 1, 1, ""])
         # Create array size scale
@@ -223,6 +223,7 @@ class RTDTempGUI:
         self.uiElements.append(self.urefEntry)
         self.uiGridParams.append([0, 1, 1, 1, "WE"])
         self.urefEntry.bind("<Return>", self.handle_updateUref)
+        self.urefEntry.bind("<KP_Enter>", self.handle_updateUref)
         # Minimum refrence voltage
         self.urefMin = 1
         # Maximum refrence voltage
@@ -239,6 +240,7 @@ class RTDTempGUI:
         self.uiElements.append(self.IRTDEntry)
         self.uiGridParams.append([1, 1, 1, 1, "WE"])
         self.IRTDEntry.bind("<Return>", self.handle_updateIRTD)
+        self.IRTDEntry.bind("<KP_Enter>", self.handle_updateIRTD)
         # Minimum RTD current
         self.IRTDMin = 0
         # Maximum RTD current
@@ -255,6 +257,7 @@ class RTDTempGUI:
         self.uiElements.append(self.offsetEntry)
         self.uiGridParams.append([2, 1, 1, 1, "WE"])
         self.offsetEntry.bind("<Return>", self.handle_updateOffset)
+        self.offsetEntry.bind("<KP_Enter>", self.handle_updateOffset)
         # Minimum offset
         self.offsetMin = -10
         # Maximum offset
@@ -271,6 +274,7 @@ class RTDTempGUI:
         self.uiElements.append(self.R0Entry)
         self.uiGridParams.append([3, 1, 1, 1, "WE"])
         self.R0Entry.bind("<Return>", self.handle_updateR0)
+        self.R0Entry.bind("<KP_Enter>", self.handle_updateR0)
         # Minimum R0
         self.R0Min = 1
         # Maximum R0
@@ -287,6 +291,7 @@ class RTDTempGUI:
         self.uiElements.append(self.R2Entry)
         self.uiGridParams.append([0, 3, 1, 1, "WE"])
         self.R2Entry.bind("<Return>", self.handle_updateR2)
+        self.R2Entry.bind("<KP_Enter>", self.handle_updateR2)
         # Minimum R2
         self.R2Min = 1
         # Maximum R2
@@ -303,6 +308,7 @@ class RTDTempGUI:
         self.uiElements.append(self.R3Entry)
         self.uiGridParams.append([1, 3, 1, 1, "WE"])
         self.R3Entry.bind("<Return>", self.handle_updateR3)
+        self.R3Entry.bind("<KP_Enter>", self.handle_updateR3)
         # Minimum R3
         self.R3Min = 1
         # Maximum R3
@@ -319,6 +325,7 @@ class RTDTempGUI:
         self.uiElements.append(self.RGainEntry)
         self.uiGridParams.append([2, 3, 1, 1, "WE"])
         self.RGainEntry.bind("<Return>", self.handle_updateRGain)
+        self.RGainEntry.bind("<KP_Enter>", self.handle_updateRGain)
         # Minimum gain resitor
         self.RGainMin = 1
         # Maximum gain resistor
@@ -372,7 +379,7 @@ class RTDTempGUI:
         self.uiElements.append(self.saveFrame1)
         self.uiGridParams.append([1, 2, 1, 1, "NS"])
         # Create save button
-        self.saveButton1 = Button(master=self.saveFrame1, text=u"\U0001f4be", font=("TkDefaultFont", 60))
+        self.saveButton1 = Button(master=self.saveFrame1, text=u"\U0001F4BE", font=("TkDefaultFont", 60))
         self.uiElements.append(self.saveButton1)
         self.uiGridParams.append([0, 0, 1, 1, ""])
         # Create label to display saved message
@@ -482,7 +489,7 @@ class RTDTempGUI:
     # Function for converting a raw input value into a Resistance (AD7819)
     def convertResistanceAD7819(self, value):
         u = self.convertVoltageAD7819(value)
-        val = self.R_2 * (u - self.offset * self.R_Gain / self.R_3) / (self.I_RTD * self.R_Gain - u + self.offset * self.R_Gain / self.R_3)
+        val = self.R2 * (u - self.offset * self.RGain / self.R3) / (self.IRTD * self.RGain - u + self.offset * self.RGain / self.R3)
         return val
     
     # Function to convert the value into a temperature
@@ -533,9 +540,9 @@ class RTDTempGUI:
             self.ax2.set_xlabel(dataMAX31865)
             self.ax2.set_ylabel("Data frequency")
     
-    # Callback function for changing the view type to histogram (auto bins)
+    # Callback function for changing the view type to Histogram (auto)
     def handle_viewHistogramAuto(self, event):
-        self.viewType.set("Histogram (auto bins)")
+        self.viewType.set("Histogram (auto)")
         if self.viewTypePrev == self.viewType.get():
             return
         self.viewTypePrev = self.viewType.get()
@@ -788,7 +795,7 @@ class RTDTempGUI:
             if self.viewType.get() == "Time series":
                 self.line1.set_xdata(self.x)
                 self.line1.set_ydata(self.data[0])
-            elif self.viewType.get() == "Histogram (auto bins)":
+            elif self.viewType.get() == "Histogram (auto)":
                 self.ax1.cla()
                 self.line1 = self.ax1.hist(self.data[0])
             elif self.viewType.get() == "Histogram (binsize 1)":
@@ -803,7 +810,7 @@ class RTDTempGUI:
                 if self.viewType.get() == "Time series":
                     self.line2.set_xdata(self.x)
                     self.line2.set_ydata(self.data[1])
-                elif self.viewType.get() == "Histogram (auto bins)":
+                elif self.viewType.get() == "Histogram (auto)":
                     self.ax2.cla()
                     self.line2 = self.ax2.hist(self.data[1])
                 elif self.viewType.get() == "Histogram (binsize 1)":
