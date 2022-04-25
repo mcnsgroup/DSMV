@@ -386,12 +386,10 @@ class RTDTempGUI:
         def updateSaveLabel1(event):
             # get all previously saved files
             AD7819Files=sorted(glob.glob(self.dir + "AD7819 *.*"))
-            print(AD7819Files)
             # get highest number of a file
             AD7819Max = ""
             if len(AD7819Files) > 0:
                 AD7819Max = AD7819Files[len(AD7819Files) - 1][11:-4]
-                print(AD7819Max)
             if AD7819Max == "" or not AD7819Max.isdigit():
                 AD7819Max = 0
             else:
