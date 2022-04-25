@@ -367,10 +367,6 @@ class RTDTempGUI:
         canvas1.draw()
         self.uiElements.append(canvas1.get_tk_widget())
         self.uiGridParams.append([1, 0, 1, 2, "NESW"])
-        # Create Image for save buttons
-        imageRaw = Image.open(self.dir + "save.png")
-        image = imageRaw.resize((100, 100))
-        saveImg = ImageTk.PhotoImage(image)
         # Create frame for saving the plot
         self.saveFrame1 = Frame()
         self.uiElements.append(self.saveFrame1)
