@@ -5,9 +5,12 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 25.04.2022, ver1.5
+# 26.04.2022, ver1.6
 # 
 # Changelog
+#   - 26.04.2022: Moved enumerated file saving to DSMVLib module,
+#                 shortened descriptions to fit on smaller screens,
+#                 fixed a bug with the computation of the resistance for the MAX31865
 #   - 25.04.2022: Added controls for all values in the precircutry of the AD7819,
 #                 added functionality to save plot data as plain text,
 #                 removed console output for debugging in a previous version
