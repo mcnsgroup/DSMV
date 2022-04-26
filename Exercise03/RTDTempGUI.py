@@ -4,9 +4,12 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 25.04.2022, ver1.5
+# 25.04.2022, ver1.6
 # 
 # Changelog
+#   - 26.04.2022: Moved enumerated file saving to DSMVLib module,
+#                 shortened descriptions to fit on smaller screens,
+#                 fixed a bug with the computation of the resistance for the MAX31865
 #   - 25.04.2022: Added controls for all values in the precircutry of the AD7819,
 #                 added functionality to save plot data as plain text,
 #                 removed console output for debugging in a previous version
@@ -117,7 +120,7 @@ class RTDTempGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 03\nv1.4")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 03\nv1.6")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -153,16 +156,16 @@ class RTDTempGUI:
         self.uiElements.append(self.timeButton)
         self.uiGridParams.append([0, 1, 1, 1, "W"])
         self.timeButton.bind("<Button-1>", self.handle_viewTimeSeries)
-        self.histAutoButton = Radiobutton(self.displaySFrame, text="Histogram (auto)", variable = self.viewType, value = "Histogram (auto)")
+        self.histAutoButton = Radiobutton(self.displaySFrame, text="Hist. (auto)", variable = self.viewType, value = "Hist. (auto)")
         self.uiElements.append(self.histAutoButton)
         self.uiGridParams.append([0, 2, 1, 1, "W"])
         self.histAutoButton.bind("<Button-1>", self.handle_viewHistogramAuto)
-        self.histOneButton = Radiobutton(self.displaySFrame, text="Histogram (binsize 1)", variable = self.viewType, value = "Histogram (binsize 1)")
+        self.histOneButton = Radiobutton(self.displaySFrame, text="Hist. (bin=1)", variable = self.viewType, value = "Hist. (bin=1)")
         self.uiElements.append(self.histOneButton)
         self.uiGridParams.append([0, 3, 1, 1, "W"])
         self.histOneButton.bind("<Button-1>", self.handle_viewHistogramOne)
         # Create Label for the unit selector
-        self.unitLabel = Label(master=self.displaySFrame, text="Unit")
+        self.unitLabel = Label(master=self.displaySFrame, text="Signal")
         self.uiElements.append(self.unitLabel)
         self.uiGridParams.append([1, 0, 1, 1, "E"])
         # Variable to hold the current unit
@@ -175,15 +178,15 @@ class RTDTempGUI:
         self.uiElements.append(self.rawButton)
         self.uiGridParams.append([1, 1, 1, 1, "W"])
         self.rawButton.bind("<Button-1>", self.handle_unitRaw)
-        self.voltageButton = Radiobutton(self.displaySFrame, text="Voltage", variable = self.unit, value = "Voltage")
+        self.voltageButton = Radiobutton(self.displaySFrame, text="V_ADCIN", variable = self.unit, value = "V_ADCIN")
         self.uiElements.append(self.voltageButton)
         self.uiGridParams.append([1, 2, 1, 1, "W"])
         self.voltageButton.bind("<Button-1>", self.handle_unitVoltage)
-        self.resistanceButton = Radiobutton(self.displaySFrame, text="Resistance", variable = self.unit, value = "Resistance")
+        self.resistanceButton = Radiobutton(self.displaySFrame, text="R_RTD", variable = self.unit, value = "R_RTD")
         self.uiElements.append(self.resistanceButton)
         self.uiGridParams.append([1, 3, 1, 1, "W"])
         self.resistanceButton.bind("<Button-1>", self.handle_unitResistance)
-        self.temperatureButton = Radiobutton(self.displaySFrame, text="Temperature", variable = self.unit, value = "Temperature")
+        self.temperatureButton = Radiobutton(self.displaySFrame, text="T_RTD", variable = self.unit, value = "T_RTD")
         self.uiElements.append(self.temperatureButton)
         self.uiGridParams.append([1, 4, 1, 1, "W"])
         self.temperatureButton.bind("<Button-1>", self.handle_unitTemperature)
@@ -387,24 +390,15 @@ class RTDTempGUI:
         self.uiElements.append(self.saveLabel1)
         self.uiGridParams.append([1, 0, 1, 1, ""])
         def updateSaveLabel1(event):
-            # get all previously saved files
-            AD7819Files=sorted(glob.glob(self.dir + "AD7819 *.*"))
-            # get highest number of a file
-            AD7819Max = ""
-            if len(AD7819Files) > 0:
-                AD7819Max = AD7819Files[len(AD7819Files) - 1][11:-4]
-            if AD7819Max == "" or not AD7819Max.isdigit():
-                AD7819Max = 0
-            else:
-                AD7819Max = int(AD7819Max)
+            path = L.savePath("AD7819", self.dir)
             # save the image
-            self.fig1.savefig(self.dir + "AD7819 " + str(AD7819Max + 1) + ".svg")
+            self.fig1.savefig(path + ".svg")
             # save the data as text
-            f = open(self.dir + "AD7819 " + str(AD7819Max + 1) + ".txt", mode = "w")
+            f = open(path + ".txt", mode = "w")
             f.write(str(self.data[0]))
             f.close
             # display the saved message
-            self.saveLabel1.configure(text="Saved as *" + str(AD7819Max + 1) + "!")
+            self.saveLabel1.configure(text="Saved as " + path + "!")
             # schedule message removal
             self.window.after(2000, lambda: self.saveLabel1.configure(text=""))
         self.saveButton1.bind("<Button-1>", updateSaveLabel1)
@@ -440,24 +434,15 @@ class RTDTempGUI:
         self.uiElements.append(self.saveLabel2)
         self.uiGridParams.append([1, 0, 1, 1, ""])
         def updateSaveLabel2(event):
-            # get all previously saved files
-            MAX31865Files=sorted(glob.glob(self.dir + "MAX31865 *.*"))
-            # get highest number of a file
-            MAX31865Max = ""
-            if len(MAX31865Files) > 0:
-                MAX31865Max = MAX31865Files[len(MAX31865Files) - 1][13:-4]
-            if MAX31865Max == "" or not MAX31865Max.isdigit():
-                MAX31865Max = 0
-            else:
-                MAX31865Max = int(MAX31865Max)
+            path = L.savePath("MAX31865", self.dir)
             # save the image
-            self.fig2.savefig(self.dir + "MAX31865 " + str(MAX31865Max + 1) + ".svg")
+            self.fig2.savefig(path + ".svg")
             # save the data as text
-            f = open(self.dir + "MAX31865 " + str(MAX31865Max + 1) + ".txt", mode = "w")
+            f = open(path + ".txt", mode = "w")
             f.write(str(self.data[1]))
             f.close
             # display the saved message
-            self.saveLabel2.configure(text="Saved as *" + str(MAX31865Max + 1) + ".svg!")
+            self.saveLabel2.configure(text="Saved as " + path + "!")
             # schedule message removal
             self.window.after(2000, lambda: self.saveLabel2.configure(text=""))
         self.saveButton2.bind("<Button-1>", updateSaveLabel2)
@@ -510,7 +495,7 @@ class RTDTempGUI:
         # Calculate the value of the resistor first
         R = self.convertResistanceMAX31865(value)
         # Now calculate the temperature
-        val = (R-100)/(self.ALPHA*self.R0)
+        val = (R-100)/(self.ALPHA*100)
         return val
     
     # Function for displaying correct labelling of the axes
@@ -540,17 +525,17 @@ class RTDTempGUI:
             self.ax2.set_xlabel(dataMAX31865)
             self.ax2.set_ylabel("Data frequency")
     
-    # Callback function for changing the view type to Histogram (auto)
+    # Callback function for changing the view type to Hist. (auto)
     def handle_viewHistogramAuto(self, event):
-        self.viewType.set("Histogram (auto)")
+        self.viewType.set("Hist. (auto)")
         if self.viewTypePrev == self.viewType.get():
             return
         self.viewTypePrev = self.viewType.get()
         self.labelAxes()
     
-    # Callback function for changing the view type to histogram (binsize 1)
+    # Callback function for changing the view type to Hist. (bin=1)
     def handle_viewHistogramOne(self, event):
-        self.viewType.set("Histogram (binsize 1)")
+        self.viewType.set("Hist. (bin=1)")
         if self.viewTypePrev == self.viewType.get():
             return
         self.viewTypePrev = self.viewType.get()
@@ -579,7 +564,7 @@ class RTDTempGUI:
     
     # Callback function for changing the unit to Volts
     def handle_unitVoltage(self, event):
-        self.unit.set("Voltage")
+        self.unit.set("V_ADCIN")
         if self.unitPrev == self.unit.get():
             return
         self.unitPrev = self.unit.get()
@@ -588,7 +573,7 @@ class RTDTempGUI:
     
     # Callback function for changing the unit to raw Ohms
     def handle_unitResistance(self, event):
-        self.unit.set("Resistance")
+        self.unit.set("R_RTD")
         if self.unitPrev == self.unit.get():
             return
         self.unitPrev = self.unit.get()
@@ -597,7 +582,7 @@ class RTDTempGUI:
     
     # Callback function for changing the unit to raw °C
     def handle_unitTemperature(self, event):
-        self.unit.set("Temperature")
+        self.unit.set("T_RTD")
         if self.unitPrev == self.unit.get():
             return
         self.unitPrev = self.unit.get()
@@ -795,10 +780,10 @@ class RTDTempGUI:
             if self.viewType.get() == "Time series":
                 self.line1.set_xdata(self.x)
                 self.line1.set_ydata(self.data[0])
-            elif self.viewType.get() == "Histogram (auto)":
+            elif self.viewType.get() == "Hist. (auto)":
                 self.ax1.cla()
                 self.line1 = self.ax1.hist(self.data[0])
-            elif self.viewType.get() == "Histogram (binsize 1)":
+            elif self.viewType.get() == "Hist. (bin=1)":
                 self.ax1.cla()
                 self.line1 = self.ax1.hist(self.data[0], bins=np.arange(min(self.data[0]), max(self.data[0]) + 2, 1))
             # Update plot legend
@@ -810,10 +795,10 @@ class RTDTempGUI:
                 if self.viewType.get() == "Time series":
                     self.line2.set_xdata(self.x)
                     self.line2.set_ydata(self.data[1])
-                elif self.viewType.get() == "Histogram (auto)":
+                elif self.viewType.get() == "Hist. (auto)":
                     self.ax2.cla()
                     self.line2 = self.ax2.hist(self.data[1])
-                elif self.viewType.get() == "Histogram (binsize 1)":
+                elif self.viewType.get() == "Hist. (bin=1)":
                     self.ax2.cla()
                     self.line2 = self.ax2.hist(self.data[1], bins=np.arange(min(self.data[1]), max(self.data[1]) + 2, 1))
                 # Update plot legend
