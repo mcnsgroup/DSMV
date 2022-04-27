@@ -111,10 +111,10 @@ class RTDTempGUI:
         self.dir = self.dir[0:len(self.dir)-13]
         # Initialize the port for the Board
         self.port = 0
-        #try:
-        #    self.port = L.sPort()
-        #except L.SerialDisconnect:
-        #    quit()
+        try:
+            self.port = L.sPort()
+        except L.SerialDisconnect:
+            quit()
         self.disconnected = False
         # List with all UI elements
         self.uiElements = []
@@ -459,7 +459,7 @@ class RTDTempGUI:
         # Display the widgets
         L.buildUI(self.uiElements, self.uiGridParams)
         # Start the reading thread
-        #self.port.start(maxSize=65536)
+        self.port.start(maxSize=65536)
         # Execute the function to read with the mainloop of the window (this is probably not the best solution)
         self.window.mainloop()
     
