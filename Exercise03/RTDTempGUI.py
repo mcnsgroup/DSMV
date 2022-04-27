@@ -4,9 +4,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 25.04.2022, ver1.6
+# 27.04.2022, ver1.6.1
 # 
 # Changelog
+#   - 27.04.2022: Shortened entry boxes to fit on smaller screens
 #   - 26.04.2022: Moved enumerated file saving to DSMVLib module,
 #                 shortened descriptions to fit on smaller screens,
 #                 fixed a bug with the computation of the resistance for the MAX31865
@@ -110,17 +111,17 @@ class RTDTempGUI:
         self.dir = self.dir[0:len(self.dir)-13]
         # Initialize the port for the Board
         self.port = 0
-        try:
-            self.port = L.sPort()
-        except L.SerialDisconnect:
-            quit()
+        #try:
+        #    self.port = L.sPort()
+        #except L.SerialDisconnect:
+        #    quit()
         self.disconnected = False
         # List with all UI elements
         self.uiElements = []
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 03\nv1.6")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 03\nv1.6.1")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -205,7 +206,7 @@ class RTDTempGUI:
         self.uiElements.append(self.boardFrame)
         self.uiGridParams.append([0, 2, 1, 1, "NESW"])
         self.boardFrame.columnconfigure(0, weight=1)
-        self.boardFrame.rowconfigure(1, weight=1)
+        self.boardFrame.rowconfigure((1, 3), weight=1)
         # Create Label for board variables
         self.boardLabel = Label(master=self.boardFrame, text="Board variables")
         self.uiElements.append(self.boardLabel)
@@ -222,7 +223,7 @@ class RTDTempGUI:
         self.urefV = StringVar()
         self.urefV.set(str(self.uref))
         # Create reference voltage entry box
-        self.urefEntry = Entry(master=self.boardSFrame, textvariable=self.urefV, justify=RIGHT)
+        self.urefEntry = Entry(master=self.boardSFrame, textvariable=self.urefV, justify=RIGHT, width=10)
         self.uiElements.append(self.urefEntry)
         self.uiGridParams.append([0, 1, 1, 1, "WE"])
         self.urefEntry.bind("<Return>", self.handle_updateUref)
@@ -239,7 +240,7 @@ class RTDTempGUI:
         self.IRTDV = StringVar()
         self.IRTDV.set(str(self.IRTD))
         # Create RTD current entry box
-        self.IRTDEntry = Entry(master=self.boardSFrame, textvariable=self.IRTDV, justify=RIGHT)
+        self.IRTDEntry = Entry(master=self.boardSFrame, textvariable=self.IRTDV, justify=RIGHT, width=10)
         self.uiElements.append(self.IRTDEntry)
         self.uiGridParams.append([1, 1, 1, 1, "WE"])
         self.IRTDEntry.bind("<Return>", self.handle_updateIRTD)
@@ -256,7 +257,7 @@ class RTDTempGUI:
         self.offsetV = StringVar()
         self.offsetV.set(str(self.offset))
         # Create offset entry box
-        self.offsetEntry = Entry(master=self.boardSFrame, textvariable=self.offsetV, justify=RIGHT)
+        self.offsetEntry = Entry(master=self.boardSFrame, textvariable=self.offsetV, justify=RIGHT, width=10)
         self.uiElements.append(self.offsetEntry)
         self.uiGridParams.append([2, 1, 1, 1, "WE"])
         self.offsetEntry.bind("<Return>", self.handle_updateOffset)
@@ -273,7 +274,7 @@ class RTDTempGUI:
         self.R0V = StringVar()
         self.R0V.set(str(self.R0))
         # Create R0 entry box
-        self.R0Entry = Entry(master=self.boardSFrame, textvariable=self.R0V, justify=RIGHT)
+        self.R0Entry = Entry(master=self.boardSFrame, textvariable=self.R0V, justify=RIGHT, width=10)
         self.uiElements.append(self.R0Entry)
         self.uiGridParams.append([3, 1, 1, 1, "WE"])
         self.R0Entry.bind("<Return>", self.handle_updateR0)
@@ -290,7 +291,7 @@ class RTDTempGUI:
         self.R2V = StringVar()
         self.R2V.set(str(self.R2))
         # Create R2 entry box
-        self.R2Entry = Entry(master=self.boardSFrame, textvariable=self.R2V, justify=RIGHT)
+        self.R2Entry = Entry(master=self.boardSFrame, textvariable=self.R2V, justify=RIGHT, width=10)
         self.uiElements.append(self.R2Entry)
         self.uiGridParams.append([0, 3, 1, 1, "WE"])
         self.R2Entry.bind("<Return>", self.handle_updateR2)
@@ -307,7 +308,7 @@ class RTDTempGUI:
         self.R3V = StringVar()
         self.R3V.set(str(self.R3))
         # Create R3 entry box
-        self.R3Entry = Entry(master=self.boardSFrame, textvariable=self.R3V, justify=RIGHT)
+        self.R3Entry = Entry(master=self.boardSFrame, textvariable=self.R3V, justify=RIGHT, width=10)
         self.uiElements.append(self.R3Entry)
         self.uiGridParams.append([1, 3, 1, 1, "WE"])
         self.R3Entry.bind("<Return>", self.handle_updateR3)
@@ -324,7 +325,7 @@ class RTDTempGUI:
         self.RGainV = StringVar()
         self.RGainV.set(str(self.RGain))
         # Create gain resitor entry box
-        self.RGainEntry = Entry(master=self.boardSFrame, textvariable=self.RGainV, justify=RIGHT)
+        self.RGainEntry = Entry(master=self.boardSFrame, textvariable=self.RGainV, justify=RIGHT, width=10)
         self.uiElements.append(self.RGainEntry)
         self.uiGridParams.append([2, 3, 1, 1, "WE"])
         self.RGainEntry.bind("<Return>", self.handle_updateRGain)
@@ -458,7 +459,7 @@ class RTDTempGUI:
         # Display the widgets
         L.buildUI(self.uiElements, self.uiGridParams)
         # Start the reading thread
-        self.port.start(maxSize=65536)
+        #self.port.start(maxSize=65536)
         # Execute the function to read with the mainloop of the window (this is probably not the best solution)
         self.window.mainloop()
     
