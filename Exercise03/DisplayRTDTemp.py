@@ -5,9 +5,11 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 26.04.2022, ver1.6
+# 27.04.2022, ver1.6.1
 # 
 # Changelog
+#   - 27.04.2022: Shortened entry boxes to fit on smaller screens
+#   - 08.04.2022: Removed comma
 #   - 26.04.2022: Moved enumerated file saving to DSMVLib module,
 #                 shortened descriptions to fit on smaller screens,
 #                 fixed a bug with the computation of the resistance for the MAX31865
