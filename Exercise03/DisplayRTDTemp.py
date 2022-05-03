@@ -5,9 +5,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 27.04.2022, ver1.6.1
+# 03.05.2022, ver1.6.2
 # 
 # Changelog
+#   - 03.05.2022: Moved entry box processing to DSMVLib module
 #   - 27.04.2022: Shortened entry boxes to fit on smaller screens
 #   - 08.04.2022: Removed comma
 #   - 26.04.2022: Moved enumerated file saving to DSMVLib module,
