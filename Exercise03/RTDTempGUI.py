@@ -7,7 +7,8 @@
 # 03.05.2022, ver1.6.2
 # 
 # Changelog
-#   - 03.05.2022: Moved entry box processing to DSMVLib module
+#   - 03.05.2022: Moved entry box processing to DSMVLib module,
+#                 greatly improved performance of histograms
 #   - 27.04.2022: Shortened entry boxes to fit on smaller screens
 #   - 26.04.2022: Moved enumerated file saving to DSMVLib module,
 #                 shortened descriptions to fit on smaller screens,
@@ -63,7 +64,7 @@ from turtle import st
 import numpy as np
 from matplotlib import *
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tkinter import *
 from PIL import Image, ImageTk
 import os
@@ -179,7 +180,7 @@ class RTDTempGUI:
         self.uiElements.append(self.rawButton)
         self.uiGridParams.append([1, 1, 1, 1, "W"])
         self.rawButton.bind("<Button-1>", self.handle_unitRaw)
-        self.voltageButton = Radiobutton(self.displaySFrame, text="V_ADCIN", variable = self.unit, value = "V_ADCIN")
+        self.voltageButton = Radiobutton(self.displaySFrame, text="U_ADCIN", variable = self.unit, value = "U_ADCIN")
         self.uiElements.append(self.voltageButton)
         self.uiGridParams.append([1, 2, 1, 1, "W"])
         self.voltageButton.bind("<Button-1>", self.handle_unitVoltage)
@@ -216,7 +217,7 @@ class RTDTempGUI:
         self.uiElements.append(self.boardSFrame)
         self.uiGridParams.append([1, 0, 1, 1, "NESW"])
         # Create label for the reference voltage entry box
-        self.urefLabel = Label(master=self.boardSFrame, text="Uref (V)")
+        self.urefLabel = Label(master=self.boardSFrame, text="U_REF (V)")
         self.uiElements.append(self.urefLabel)
         self.uiGridParams.append([0, 0, 1, 1, "E"])
         # Variable to control content of the reference voltage entry box
@@ -233,7 +234,7 @@ class RTDTempGUI:
         # Maximum refrence voltage
         self.urefMax = 10
         # Create label for the RTD current entry box
-        self.IRTDLabel = Label(master=self.boardSFrame, text="RTD current (A)")
+        self.IRTDLabel = Label(master=self.boardSFrame, text="I_RTD (A)")
         self.uiElements.append(self.IRTDLabel)
         self.uiGridParams.append([1, 0, 1, 1, "E"])
         # Variable to control content of the RTD current entry box
@@ -250,7 +251,7 @@ class RTDTempGUI:
         # Maximum RTD current
         self.IRTDMax = 1
         # Create label for the offset entry box
-        self.offsetLabel = Label(master=self.boardSFrame, text="Offset (V)")
+        self.offsetLabel = Label(master=self.boardSFrame, text="U_offset (V)")
         self.uiElements.append(self.offsetLabel)
         self.uiGridParams.append([2, 0, 1, 1, "E"])
         # Variable to control content of the offset entry box
@@ -267,7 +268,7 @@ class RTDTempGUI:
         # Maximum offset
         self.offsetMax = 10
         # Create label for the R0 entry box
-        self.R0Label = Label(master=self.boardSFrame, text="R0 (" + u"\U000003A9" + ")")
+        self.R0Label = Label(master=self.boardSFrame, text="R_0 (" + u"\U000003A9" + ")")
         self.uiElements.append(self.R0Label)
         self.uiGridParams.append([3, 0, 1, 1, "E"])
         # Variable to control content of the R0 entry box
@@ -284,7 +285,7 @@ class RTDTempGUI:
         # Maximum R0
         self.R0Max = 100000
         # Create label for the R2 entry box
-        self.R2Label = Label(master=self.boardSFrame, text="R2 (" + u"\U000003A9" + ")")
+        self.R2Label = Label(master=self.boardSFrame, text="R_2 (" + u"\U000003A9" + ")")
         self.uiElements.append(self.R2Label)
         self.uiGridParams.append([0, 2, 1, 1, "E"])
         # Variable to control content of the R2 entry box
@@ -301,7 +302,7 @@ class RTDTempGUI:
         # Maximum R2
         self.R2Max = 1000000
         # Create label for the R3 entry box
-        self.R3Label = Label(master=self.boardSFrame, text="R3 (" + u"\U000003A9" + ")")
+        self.R3Label = Label(master=self.boardSFrame, text="R_3 (" + u"\U000003A9" + ")")
         self.uiElements.append(self.R3Label)
         self.uiGridParams.append([1, 2, 1, 1, "E"])
         # Variable to control content of the R3 entry box
@@ -318,7 +319,7 @@ class RTDTempGUI:
         # Maximum R3
         self.R3Max = 1000000
         # Create label for the gain resistor entry box
-        self.RGainLabel = Label(master=self.boardSFrame, text="RGain (" + u"\U000003A9" + ")")
+        self.RGainLabel = Label(master=self.boardSFrame, text="R_gain (" + u"\U000003A9" + ")")
         self.uiElements.append(self.RGainLabel)
         self.uiGridParams.append([2, 2, 1, 1, "E"])
         # Variable to control content of the RGain entry box
@@ -378,6 +379,16 @@ class RTDTempGUI:
         canvas1.draw()
         self.uiElements.append(canvas1.get_tk_widget())
         self.uiGridParams.append([1, 0, 1, 2, "NESW"])
+        canvas1.get_tk_widget().bind('<Button-1>', self.handle_clickCanvas1)
+        #plt.connect('button_press_event', self.handle_clickCanvas1)
+        self.annotation = self.ax1.annotate('x: %0.2f\ny: %0.2f' %(0, 0), 
+            xy=(0, 0), xytext=(10, 15),
+            textcoords='offset points',
+            bbox=dict(alpha=0.5),
+            arrowprops=dict(arrowstyle='->')
+        )
+        self.annotation.set_visible(False)
+        #self.annotation.bind('<Button-1>', self.hideAnnotation1)
         # Create frame for saving the plot
         self.saveFrame1 = Frame()
         self.uiElements.append(self.saveFrame1)
@@ -565,7 +576,7 @@ class RTDTempGUI:
     
     # Callback function for changing the unit to Volts
     def handle_unitVoltage(self, event):
-        self.unit.set("V_ADCIN")
+        self.unit.set("U_ADCIN")
         if self.unitPrev == self.unit.get():
             return
         self.unitPrev = self.unit.get()
@@ -700,6 +711,21 @@ class RTDTempGUI:
         self.RGainV.set(str(self.RGain))
         self.window.update_idletasks()
     
+    # Event handler for clicking on canvas 1
+    def handle_clickCanvas1(self, event=0):
+        L.pln("Plot was clicked")
+        x, y = event.x, event.y
+        self.annotation.remove()
+        self.annotation = self.ax1.annotate('x: %0.2f\ny: %0.2f' %(x, y), 
+            xy=(0, 0), xytext=(10, 15),
+            textcoords='offset points',
+            bbox=dict(alpha=0.5),
+            arrowprops=dict(arrowstyle='->')
+        )
+    
+    def hideAnnotation1(self, event=0):
+        self.annotation.set_visible(False)
+    
     # Checks whether the board is still connected and acts accordingly
     def checkConnection(self):
         # Prepare for restoring settings on reconnect
@@ -762,10 +788,10 @@ class RTDTempGUI:
                 self.line1.set_ydata(self.data[0])
             elif self.viewType.get() == "Hist. (auto)":
                 self.ax1.cla()
-                self.line1 = self.ax1.hist(self.data[0])
+                self.line1 = self.ax1.hist(self.data[0], histtype='step')
             elif self.viewType.get() == "Hist. (bin=1)":
                 self.ax1.cla()
-                self.line1 = self.ax1.hist(self.data[0], bins=np.arange(min(self.data[0]), max(self.data[0]) + 2, 1))
+                self.line1 = self.ax1.hist(self.data[0], bins=np.arange(min(self.data[0]), max(self.data[0]) + 2, 1), histtype='step')
             # Update plot legend
             self.legend1 = self.ax1.legend(loc="upper left", title="Last value: %.2f" %self.data[0][len(self.data[0])-1])
             # Label axes correctly
@@ -777,10 +803,10 @@ class RTDTempGUI:
                     self.line2.set_ydata(self.data[1])
                 elif self.viewType.get() == "Hist. (auto)":
                     self.ax2.cla()
-                    self.line2 = self.ax2.hist(self.data[1])
+                    self.line2 = self.ax2.hist(self.data[1], histtype='step')
                 elif self.viewType.get() == "Hist. (bin=1)":
                     self.ax2.cla()
-                    self.line2 = self.ax2.hist(self.data[1], bins=np.arange(min(self.data[1]), max(self.data[1]) + 2, 1))
+                    self.line2 = self.ax2.hist(self.data[1], bins=np.arange(min(self.data[1]), max(self.data[1]) + 2, 1), histtype='step')
                 # Update plot legend
                 self.legend2 = self.ax2.legend(loc="upper left", title="Last value: %.2f" %self.data[1][len(self.data[1])-1])
                 # Label axes correctly
