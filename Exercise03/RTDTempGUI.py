@@ -4,9 +4,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 27.04.2022, ver1.6.1
+# 03.05.2022, ver1.6.2
 # 
 # Changelog
+#   - 03.05.2022: Moved entry box processing to DSMVLib module
 #   - 27.04.2022: Shortened entry boxes to fit on smaller screens
 #   - 26.04.2022: Moved enumerated file saving to DSMVLib module,
 #                 shortened descriptions to fit on smaller screens,
@@ -66,7 +67,6 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from tkinter import *
 from PIL import Image, ImageTk
 import os
-import glob
 # Import custom module
 from DSMVLib import DSMVLib as L
 
@@ -121,7 +121,7 @@ class RTDTempGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 03\nv1.6.1")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 03\nv1.6.2")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -604,9 +604,8 @@ class RTDTempGUI:
     
     # Event handler for reference voltage input box
     def handle_updateUref(self, event=0):
-        # Make sure the input is a number
-        try:
-            newUref = float(self.urefEntry.get())
+        newUref = L.toFloat(self.urefEntry.get())
+        if newUref != None:
             # Make sure the input is in the input range
             if newUref < self.urefMin:
                 newUref = self.urefMin
@@ -614,16 +613,13 @@ class RTDTempGUI:
                 newUref = self.urefMax
             # Update variable for reference voltage
             self.uref = newUref
-        except ValueError:
-            pass
         self.urefV.set(str(self.uref))
         self.window.update_idletasks()
     
     # Event handler for RTD current input box
     def handle_updateIRTD(self, event=0):
-        # Make sure the input is a number
-        try:
-            newIRTD = float(self.IRTDEntry.get())
+        newIRTD = L.toFloat(self.IRTDEntry.get())
+        if newIRTD != None:
             # Make sure the input is in the input range
             if newIRTD < self.IRTDMin:
                 newIRTD = self.IRTDMin
@@ -631,16 +627,13 @@ class RTDTempGUI:
                 newIRTD = self.IRTDMax
             # Update variable for reference voltage
             self.IRTD = newIRTD
-        except ValueError:
-            pass
         self.IRTDV.set(str(self.IRTD))
         self.window.update_idletasks()
     
     # Event handler for offset input box
     def handle_updateOffset(self, event=0):
-        # Make sure the input is a number
-        try:
-            newOffset = float(self.offsetEntry.get())
+        newOffset = L.toFloat(self.offsetEntry.get())
+        if newOffset != None:
             # Make sure the input is in the input range
             if newOffset < self.offsetMin:
                 newOffset = self.offsetMin
@@ -648,16 +641,13 @@ class RTDTempGUI:
                 newOffset = self.offsetMax
             # Update variable for reference voltage
             self.offset = newOffset
-        except ValueError:
-            pass
         self.offsetV.set(str(self.offset))
         self.window.update_idletasks()
     
     # Event handler for R0 input box
     def handle_updateR0(self, event=0):
-        # Make sure the input is a number
-        try:
-            newR0 = float(self.R0Entry.get())
+        newR0 = L.toFloat(self.R0Entry.get())
+        if newR0 != None:
             # Make sure the input is in the input range
             if newR0 < self.R0Min:
                 newR0 = self.R0Min
@@ -665,16 +655,13 @@ class RTDTempGUI:
                 newR0 = self.R0Max
             # Update variable for reference voltage
             self.R0 = newR0
-        except ValueError:
-            pass
         self.R0V.set(str(self.R0))
         self.window.update_idletasks()
     
     # Event handler for R2 input box
     def handle_updateR2(self, event=0):
-        # Make sure the input is a number
-        try:
-            newR2 = float(self.R2Entry.get())
+        newR2 = L.toFloat(self.R2Entry.get())
+        if newR2 != None:
             # Make sure the input is in the input range
             if newR2 < self.R2Min:
                 newR2 = self.R2Min
@@ -682,16 +669,13 @@ class RTDTempGUI:
                 newR2 = self.R2Max
             # Update variable for reference voltage
             self.R2 = newR2
-        except ValueError:
-            pass
         self.R2V.set(str(self.R2))
         self.window.update_idletasks()
     
     # Event handler for R3 input box
     def handle_updateR3(self, event=0):
-        # Make sure the input is a number
-        try:
-            newR3 = float(self.R3Entry.get())
+        newR3 = L.toFloat(self.R3Entry.get())
+        if newR3 != None:
             # Make sure the input is in the input range
             if newR3 < self.R3Min:
                 newR3 = self.R3Min
@@ -699,16 +683,13 @@ class RTDTempGUI:
                 newR3 = self.R3Max
             # Update variable for reference voltage
             self.R3 = newR3
-        except ValueError:
-            pass
         self.R3V.set(str(self.R3))
         self.window.update_idletasks()
     
     # Event handler for gain resitor input box
     def handle_updateRGain(self, event=0):
-        # Make sure the input is a number
-        try:
-            newRGain = float(self.RGainEntry.get())
+        newRGain = L.toFloat(self.RGainEntry.get())
+        if newRGain != None:
             # Make sure the input is in the input range
             if newRGain < self.RGainMin:
                 newRGain = self.RGainMin
@@ -716,8 +697,6 @@ class RTDTempGUI:
                 newRGain = self.RGainMax
             # Update variable for reference voltage
             self.RGain = newRGain
-        except ValueError:
-            pass
         self.RGainV.set(str(self.RGain))
         self.window.update_idletasks()
     
