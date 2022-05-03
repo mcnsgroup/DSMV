@@ -5,9 +5,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 27.04.2022, ver1.7
+# 03.05.2022, ver1.7.1
 # 
 # Changelog
+#   - 03.05.2022: Moved entry box processing to DSMVLib module
 #   - 27.04.2022: Changed building of the GUI to modular function from DSMVLib,
 #                 added version indicator in GUI,
 #                 added functionality to save plot data as plain text,
