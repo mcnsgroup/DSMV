@@ -4,9 +4,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 27.04.2022, ver1.7
+# 03.05.2022, ver1.7.1
 # 
 # Changelog
+#   - 03.05.2022: Moved entry box processing to DSMVLib module
 #   - 27.04.2022: Changed building of the GUI to modular function from DSMVLib,
 #                 added version indicator in GUI,
 #                 added functionality to save plot data as plain text,
@@ -70,10 +71,10 @@ class DisplayDSMVGUI:
         self.dir = self.dir[0:len(self.dir)-17]
         # Initialize the port for the Board
         self.port = 0
-        #try:
-        #    self.port = L.sPort()
-        #except L.SerialDisconnect:
-        #    quit()
+        try:
+            self.port = L.sPort()
+        except L.SerialDisconnect:
+            quit()
         self.disconnected = False
         self.oversamplesDefault = 1
         self.oversamples = self.oversamplesDefault
@@ -89,7 +90,7 @@ class DisplayDSMVGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 04\nv1.6.1")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 04\nv1.7.1")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -386,14 +387,14 @@ class DisplayDSMVGUI:
         self.uiGridParams.append([2, 0, 1, 1, "NW"])
         self.waitLabel = Label(text="Initializing... ",
                                font=("", 100))
-        #self.updateAll(True)
+        self.updateAll(True)
         self.waitLabel.grid_forget()
         # Display the widgets
         L.buildUI(self.uiElements, self.uiGridParams)
         # Maximize the window
         self.window.attributes("-zoomed", True)
         # Start the reading thread
-        #self.port.start(maxSize=self.dataSizeMax*3*4)
+        self.port.start(maxSize=self.dataSizeMax*3*4)
         # Execute the function to read with the mainloop of the window (this is probably not the best solution)
         self.window.mainloop()
     
@@ -521,9 +522,8 @@ class DisplayDSMVGUI:
         if self.reading:
             reactivate = True
             self.reading = False
-        # Make sure the input is a number
-        try:
-            newSamplerate = float(self.freqEntry.get())
+        newSamplerate = L.toFloat(self.freqEntry.get())
+        if newSamplerate != None:
             # Make sure the input is in the input range
             if newSamplerate < self.samplerateMin:
                 newSamplerate = self.samplerateMin
@@ -537,8 +537,6 @@ class DisplayDSMVGUI:
             self.updateTimeAxes()
             # Clear serial buffer
             self.port.clearBuffer()
-        except ValueError:
-            pass
         self.samplerateV.set(str(self.samplerate))
         self.window.update_idletasks()
         # Reactivate reading if paused by this function
