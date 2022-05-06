@@ -4,10 +4,16 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 03.05.2022, ver1.7.1
+# 06.05.2022, ver1.8
 # 
 # Changelog
-#   - 03.05.2022: Moved entry box processing to DSMVLib module
+#   - 06.05.2022: Added functionality to show raw values,
+#                 added functionality to show data as histograms,
+#                 increased maximum oversampling to 65536,
+#                 added indicator for time/series,
+#                 minor design changes
+#   - 03.05.2022: Moved entry box processing to DSMVLib module,
+#                 changed save label to unicode symbol
 #   - 27.04.2022: Changed building of the GUI to modular function from DSMVLib,
 #                 added version indicator in GUI,
 #                 added functionality to save plot data as plain text,
@@ -43,6 +49,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 # Import official modules
+from cProfile import label
 import numpy as np
 from matplotlib.pyplot import *
 from matplotlib.figure import Figure
@@ -64,7 +71,7 @@ class DisplayDSMVGUI:
         self.window = Tk()
         L.window = self.window
         self.window.title("Display DSMV GUI")
-        self.window.columnconfigure(0, weight=1)
+        self.window.columnconfigure(1, weight=1)
         self.window.rowconfigure((1, 2, 3), weight=1)
         # Get file path
         self.dir = os.path.relpath(__file__)
@@ -90,14 +97,14 @@ class DisplayDSMVGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 04\nv1.7.1")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 04\nv1.8")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
         self.controlFrame = Frame()
         self.uiElements.append(self.controlFrame)
-        self.uiGridParams.append([0, 0, 1, 2, "WE"])
-        self.controlFrame.columnconfigure((0, 1), weight=1)
+        self.uiGridParams.append([0, 1, 1, 2, "WE"])
+        self.controlFrame.columnconfigure(1, weight=1)
         # create frame for the data settings
         self.dataFrame = Frame(master=self.controlFrame, relief=RIDGE, borderwidth=2)
         self.uiElements.append(self.dataFrame)
@@ -113,24 +120,24 @@ class DisplayDSMVGUI:
         self.uiElements.append(self.dataSFrame)
         self.uiGridParams.append([1, 0, 1, 1, "NESW"])
         self.dataSFrame.columnconfigure(1, weight=1)
-        # Create label for the oversamples entry box
-        self.oversLabel = Label(master=self.dataSFrame, text="Number of oversamples")
-        self.uiElements.append(self.oversLabel)
+        # Create label for the samplerate entry box
+        self.freqLabel = Label(master=self.dataSFrame, text="f_s (Hz)")
+        self.uiElements.append(self.freqLabel)
         self.uiGridParams.append([0, 0, 1, 1, "E"])
-        # Variable to control content of the oversamples entry box
-        self.oversamplesV = StringVar()
-        self.oversamplesV.set(str(self.oversamples))
-        # Create oversamples entry box
-        self.oversEntry = Entry(master=self.dataSFrame, textvariable=self.oversamplesV, justify=RIGHT)
-        self.uiElements.append(self.oversEntry)
+        # Variable to control content of the samplerate entry box
+        self.samplerateV = StringVar()
+        self.samplerateV.set(str(self.samplerate))
+        # Create samplerate entry box
+        self.freqEntry = Entry(master=self.dataSFrame, textvariable=self.samplerateV, justify=RIGHT)
+        self.uiElements.append(self.freqEntry)
         self.uiGridParams.append([0, 1, 1, 1, "WE"])
-        self.oversEntry.bind("<Return>", self.handle_updateOvers)
-        # Minimum oversamples
-        self.oversMin = 1
-        # Maximum oversamples
-        self.oversMax = 256
+        self.freqEntry.bind("<Return>", self.handle_updateFreq)
+        # Minimum samplerate
+        self.samplerateMin = 1
+        # Maximum samplerate
+        self.samplerateMax = 90000
         # Create label for the data size entry box
-        self.sizeLabel = Label(master=self.dataSFrame, text="Number of data points")
+        self.sizeLabel = Label(master=self.dataSFrame, text="N_s")
         self.uiElements.append(self.sizeLabel)
         self.uiGridParams.append([1, 0, 1, 1, "E"])
         # Variable to control content of the data size entry box
@@ -145,22 +152,66 @@ class DisplayDSMVGUI:
         self.dataSizeMin = 1
         # Maximum data size
         self.dataSizeMax = 32768 #due to not being able to change the buffer size of pyserial to something greater that 4095, the speed is severly limited
-        # Create label for the samplerate entry box
-        self.freqLabel = Label(master=self.dataSFrame, text="Samplerate (Hz)")
-        self.uiElements.append(self.freqLabel)
+        # Create label for the oversamples entry box
+        self.oversLabel = Label(master=self.dataSFrame, text="N_o")
+        self.uiElements.append(self.oversLabel)
         self.uiGridParams.append([2, 0, 1, 1, "E"])
-        # Variable to control content of the samplerate entry box
-        self.samplerateV = StringVar()
-        self.samplerateV.set(str(self.samplerate))
-        # Create samplerate entry box
-        self.freqEntry = Entry(master=self.dataSFrame, textvariable=self.samplerateV, justify=RIGHT)
-        self.uiElements.append(self.freqEntry)
+        # Variable to control content of the oversamples entry box
+        self.oversamplesV = StringVar()
+        self.oversamplesV.set(str(self.oversamples))
+        # Create oversamples entry box
+        self.oversEntry = Entry(master=self.dataSFrame, textvariable=self.oversamplesV, justify=RIGHT)
+        self.uiElements.append(self.oversEntry)
         self.uiGridParams.append([2, 1, 1, 1, "WE"])
-        self.freqEntry.bind("<Return>", self.handle_updateFreq)
-        # Minimum data size
-        self.samplerateMin = 1
-        # Maximum data size
-        self.samplerateMax = 90000
+        self.oversEntry.bind("<Return>", self.handle_updateOvers)
+        # Minimum oversamples
+        self.oversMin = 1
+        # Maximum oversamples
+        self.oversMax = 65536
+        # Create label for the signal type switch
+        self.signalLabel = Label(master=self.dataSFrame, text="Signal")
+        self.uiElements.append(self.signalLabel)
+        self.uiGridParams.append([0, 2, 1, 1, "E"])
+        # Variable to hold the current signal type setting
+        self.signal = StringVar()
+        self.signal.set("Voltage")
+        # Variable that holds the previous signal type setting
+        self.signalPrev = "Voltage"
+        # Create signal type selector buttons
+        self.voltageButton = Radiobutton(self.dataSFrame, text="Voltage", variable = self.signal, value = "Voltage")
+        self.uiElements.append(self.voltageButton)
+        self.uiGridParams.append([0, 3, 1, 1, "E"])
+        self.voltageButton.bind("<Button-1>", self.handle_signalVoltage)
+        self.rawButton = Radiobutton(self.dataSFrame, text="Raw Value", variable = self.signal, value = "Raw Value")
+        self.uiElements.append(self.rawButton)
+        self.uiGridParams.append([0, 4, 1, 1, "W"])
+        self.rawButton.bind("<Button-1>", self.handle_signalRaw)
+        # Create Label for the view type selector
+        self.viewLabel = Label(master=self.dataSFrame, text="View type")
+        self.uiElements.append(self.viewLabel)
+        self.uiGridParams.append([1, 2, 1, 1, "E"])
+        # Variable to hold the current view type
+        self.viewType = StringVar()
+        self.viewType.set("Time series")
+        # Variable that holds the previous view type
+        self.viewTypePrev = "Time series"
+        # Create view type selector buttons
+        self.timeButton = Radiobutton(self.dataSFrame, text="Time series", variable = self.viewType, value = "Time series")
+        self.uiElements.append(self.timeButton)
+        self.uiGridParams.append([1, 3, 1, 1, "W"])
+        self.timeButton.bind("<Button-1>", self.handle_viewTimeSeries)
+        self.histAutoButton = Radiobutton(self.dataSFrame, text="Hist. (auto)", variable = self.viewType, value = "Hist. (auto)")
+        self.uiElements.append(self.histAutoButton)
+        self.uiGridParams.append([1, 4, 1, 1, "W"])
+        self.histAutoButton.bind("<Button-1>", self.handle_viewHistogramAuto)
+        self.histOneButton = Radiobutton(self.dataSFrame, text="Hist. (bin=1)", variable = self.viewType, value = "Hist. (bin=1)")
+        self.uiElements.append(self.histOneButton)
+        self.uiGridParams.append([1, 5, 1, 1, "W"])
+        self.histOneButton.bind("<Button-1>", self.handle_viewHistogramOne)
+        # Label to show time required to assemble one full data set
+        self.timeLabel = Label(master=self.dataSFrame, text="Time/series: 0.1s")
+        self.uiElements.append(self.timeLabel)
+        self.uiGridParams.append([2, 2, 1, 4, "W"])
         # Create frame for the trigger settings
         self.triggerFrame = Frame(master=self.controlFrame, relief=RIDGE, borderwidth=2)
         self.uiElements.append(self.triggerFrame)
@@ -220,7 +271,7 @@ class DisplayDSMVGUI:
         # create frame for the run control
         self.runFrame = Frame(master=self.controlFrame, relief=RIDGE, borderwidth=2)
         self.uiElements.append(self.runFrame)
-        self.uiGridParams.append([0, 2, 1, 1, "NESW"])
+        self.uiGridParams.append([0, 4, 1, 1, "NESW"])
         self.runFrame.rowconfigure(1, weight=1)
         # Create Label for run control
         self.runLabel = Label(master=self.runFrame, text="Run control")
@@ -231,12 +282,12 @@ class DisplayDSMVGUI:
         self.uiElements.append(self.runSFrame)
         self.uiGridParams.append([1, 0, 1, 1, "NESW"])
         self.runSFrame.rowconfigure(1, weight=1)
-        # Create label for the read switch
-        self.readLabel = Label(master=self.runSFrame, text="Reading")
+        # Create label for the reading status
+        self.readLabel = Label(master=self.runSFrame, text="Paused")
         self.uiElements.append(self.readLabel)
         self.uiGridParams.append([0, 0, 1, 1, ""])
         # Create read switch
-        self.readSwitch = Button(master=self.runSFrame, text="Pause              ")
+        self.readSwitch = Button(master=self.runSFrame, text="Run                ")
         self.uiElements.append(self.readSwitch)
         self.uiGridParams.append([0, 1, 1, 1, ""])
         self.readSwitch.bind("<Button-1>", self.handle_switchRead)
@@ -249,6 +300,12 @@ class DisplayDSMVGUI:
         self.uiElements.append(self.stopButton)
         self.uiGridParams.append([1, 0, 1, 2, "NESW"])
         self.stopButton.bind("<Button-1>", self.stop)
+        # Axis labels for the data from the ADCs
+        self.dataAD4020 = "Voltage AD4020 (V)"
+        self.dataLTC2500 = "Voltage LTC2500 (V)"
+        self.dataInternal = "Voltage internal ADC (V)"
+        # Unit label for legend
+        self.unit = "V"
         # Create canvas for the time series of the AD4020
         self.fig1 = Figure(figsize=(5, 2), layout='constrained')
         # Maximum time value
@@ -266,11 +323,11 @@ class DisplayDSMVGUI:
         canvas1 = FigureCanvasTkAgg(self.fig1)
         canvas1.draw()
         self.uiElements.append(canvas1.get_tk_widget())
-        self.uiGridParams.append([1, 0, 1, 1, "NESW"])
+        self.uiGridParams.append([1, 0, 1, 2, "NESW"])
         # Create frame for saving the plot
         self.saveFrame1 = Frame()
         self.uiElements.append(self.saveFrame1)
-        self.uiGridParams.append([1, 1, 1, 1, "NS"])
+        self.uiGridParams.append([1, 2, 1, 1, "NS"])
         # Create save button
         self.saveButton1 = Button(master=self.saveFrame1, text=u"\U0001F4BE", font=("TkDefaultFont", 60))
         self.uiElements.append(self.saveButton1)
@@ -310,11 +367,11 @@ class DisplayDSMVGUI:
         canvas2 = FigureCanvasTkAgg(self.fig2)
         canvas2.draw()
         self.uiElements.append(canvas2.get_tk_widget())
-        self.uiGridParams.append([2, 0, 1, 1, "NESW"])
+        self.uiGridParams.append([2, 0, 1, 2, "NESW"])
         # Create frame for saving the plot
         self.saveFrame2 = Frame()
         self.uiElements.append(self.saveFrame2)
-        self.uiGridParams.append([2, 1, 1, 1, "NS"])
+        self.uiGridParams.append([2, 2, 1, 1, "NS"])
         # Create save button
         self.saveButton2 = Button(master=self.saveFrame2, text=u"\U0001F4BE", font=("TkDefaultFont", 60))
         self.uiElements.append(self.saveButton2)
@@ -354,11 +411,11 @@ class DisplayDSMVGUI:
         canvas3 = FigureCanvasTkAgg(self.fig3)
         canvas3.draw()
         self.uiElements.append(canvas3.get_tk_widget())
-        self.uiGridParams.append([3, 0, 1, 1, "NESW"])
+        self.uiGridParams.append([3, 0, 1, 2, "NESW"])
         # Create frame for saving the plot
         self.saveFrame3 = Frame()
         self.uiElements.append(self.saveFrame3)
-        self.uiGridParams.append([3, 1, 1, 1, "NS"])
+        self.uiGridParams.append([3, 2, 1, 1, "NS"])
         # Create save button
         self.saveButton3 = Button(master=self.saveFrame3, text=u"\U0001F4BE", font=("TkDefaultFont", 60))
         self.uiElements.append(self.saveButton3)
@@ -403,10 +460,10 @@ class DisplayDSMVGUI:
         pre = "Initializing... "
         if not init:
             pre = "Restoring Settings... "
-        self.waitLabel.grid(row=0, column=0, sticky="WE")
+        self.waitLabel.grid(row=0, column=0, columnspan=2, sticky="WE")
         self.waitLabel.configure(text=pre + "\\")
         self.window.update_idletasks()
-        self.handle_updateOvers()
+        self.handle_updateFreq()
         time.sleep(0.005)
         self.waitLabel.configure(text=pre + "|")
         self.window.update_idletasks()
@@ -414,66 +471,73 @@ class DisplayDSMVGUI:
         time.sleep(0.005)
         self.waitLabel.configure(text=pre + "/")
         self.window.update_idletasks()
-        self.handle_updateFreq()
+        self.handle_updateOvers()
         time.sleep(0.005)
         self.waitLabel.configure(text=pre + "-")
         self.window.update_idletasks()
-        self.handle_updateTriggerSource()
+        if self.signal.get() == "Voltage":
+            self.handle_signalVoltage()
+        else:
+            self.handle_signalRaw()
         time.sleep(0.005)
         self.waitLabel.configure(text=pre + "\\")
         self.window.update_idletasks()
-        self.handle_updateThreshold()
+        self.handle_updateTriggerSource()
         time.sleep(0.005)
         self.waitLabel.configure(text=pre + "|")
+        self.window.update_idletasks()
+        self.handle_updateThreshold()
+        time.sleep(0.005)
+        self.waitLabel.configure(text=pre + "/")
         self.window.update_idletasks()
         if self.flank.get() == "Falling":
             self.handle_flankFalling()
         else:
             self.handle_flankRising()
         time.sleep(0.005)
-        self.waitLabel.configure(text=pre + "/")
+        self.waitLabel.configure(text=pre + "-")
         self.window.update_idletasks()
         self.port.writeL('activate AD4020')
         time.sleep(0.005)
-        self.waitLabel.configure(text=pre + "-")
+        self.waitLabel.configure(text=pre + "\\")
         self.window.update_idletasks()
         self.port.writeL('activate LTC2500')
         time.sleep(0.005)
-        self.waitLabel.configure(text=pre + "\\")
+        self.waitLabel.configure(text=pre + "|")
         self.window.update_idletasks()
         self.port.writeL('activate Internal ADC')
         time.sleep(0.005)
     
-    # Event handler for oversamples entry box
-    def handle_updateOvers(self, event=0):
+    # Event handler for samplerate entry box
+    def handle_updateFreq(self, event=0):
         # Stop reading during update
         reactivate = False
         if self.reading:
             reactivate = True
             self.reading = False
-        # Make sure the input is an integer
-        if self.oversEntry.get().isdigit():
-            newOvers = int(self.oversEntry.get())
+        newSamplerate = L.toFloat(self.freqEntry.get())
+        if newSamplerate != None:
             # Make sure the input is in the input range
-            if newOvers < self.oversMin:
-                newOvers = self.oversMin
-            if newOvers > self.oversMax:
-                newOvers = self.oversMax
-            # Update variable for oversamples
-            self.oversamples = newOvers
+            if newSamplerate < self.samplerateMin:
+                newSamplerate = self.samplerateMin
+            if newSamplerate > self.samplerateMax:
+                newSamplerate = self.samplerateMax
+            # Update variable for samplerate
+            self.samplerate = newSamplerate
             # Write command to serial port
-            self.port.writeL('set oversamples ' + str(self.oversamples))
+            self.port.writeL('set samplerate ' + str(self.samplerate))
             # Update the time axes
             self.updateTimeAxes()
             # Clear serial buffer
             self.port.clearBuffer()
-        self.oversamplesV.set(str(self.oversamples))
+        self.samplerateV.set(str(self.samplerate))
+        self.timeLabel['text'] = "Time/series: %.4fs" %(self.dataSize * self.oversamples / self.samplerate)
         self.window.update_idletasks()
         # Reactivate reading if paused by this function
         if reactivate:
             self.reading = True
             self.window.after(0, self.readDisp)
-
+    
     # Event handler for data size entry box
     def handle_updateSize(self, event=0):
         # Stop reading during update
@@ -509,40 +573,117 @@ class DisplayDSMVGUI:
             # Clear serial buffer
             self.port.clearBuffer()
         self.dataSizeV.set(str(self.dataSize))
+        self.timeLabel['text'] = "Time/series: %.4fs" %(self.dataSize * self.oversamples / self.samplerate)
         self.window.update_idletasks()
         # Reactivate reading if paused by this function
         if reactivate:
             self.reading = True
             self.window.after(0, self.readDisp)
     
-    # Event handler for samplerate entry box
-    def handle_updateFreq(self, event=0):
+    # Event handler for oversamples entry box
+    def handle_updateOvers(self, event=0):
         # Stop reading during update
         reactivate = False
         if self.reading:
             reactivate = True
             self.reading = False
-        newSamplerate = L.toFloat(self.freqEntry.get())
-        if newSamplerate != None:
+        # Make sure the input is an integer
+        if self.oversEntry.get().isdigit():
+            newOvers = int(self.oversEntry.get())
             # Make sure the input is in the input range
-            if newSamplerate < self.samplerateMin:
-                newSamplerate = self.samplerateMin
-            if newSamplerate > self.samplerateMax:
-                newSamplerate = self.samplerateMax
-            # Update variable for samplerate
-            self.samplerate = newSamplerate
+            if newOvers < self.oversMin:
+                newOvers = self.oversMin
+            if newOvers > self.oversMax:
+                newOvers = self.oversMax
+            # Update variable for oversamples
+            self.oversamples = newOvers
             # Write command to serial port
-            self.port.writeL('set samplerate ' + str(self.samplerate))
+            self.port.writeL('set oversamples ' + str(self.oversamples))
             # Update the time axes
             self.updateTimeAxes()
             # Clear serial buffer
             self.port.clearBuffer()
-        self.samplerateV.set(str(self.samplerate))
+        self.oversamplesV.set(str(self.oversamples))
+        self.timeLabel['text'] = "Time/series: %.4fs" %(self.dataSize * self.oversamples / self.samplerate)
         self.window.update_idletasks()
         # Reactivate reading if paused by this function
         if reactivate:
             self.reading = True
             self.window.after(0, self.readDisp)
+    
+    # Callback function for changing the signal type to raw value
+    def handle_signalVoltage(self, event=0):
+        self.signal.set("Voltage")
+        self.signalPrev = self.signal.get()
+        self.unit = "V"
+        self.labelAxes()
+        # Write command to serial port
+        self.port.writeL("set signalType voltage")
+    
+    # Callback function for changing the signal type to raw value
+    def handle_signalRaw(self, event=0):
+        self.signal.set("Raw value")
+        self.signalPrev = self.signal.get()
+        self.unit = ""
+        self.labelAxes()
+        # Write command to serial port
+        self.port.writeL("set signalType raw")
+    
+    # Function for displaying correct labelling of the axes
+    def labelAxes(self):
+        if self.signal.get() == "Raw value":
+            self.dataAD4020 = "Raw value AD4020"
+            self.dataLTC2500 = "Raw value LTC2500"
+            self.dataInternal = "Raw value Internal ADC"
+        elif self.signal.get() == "Voltage":
+            self.dataAD4020 = "Voltage AD4020 (V)"
+            self.dataLTC2500 = "Voltage LTC2500 (V)"
+            self.dataInternal = "Voltage internal ADC (V)"
+        if self.viewType.get() == "Time series":
+            self.ax1.set_xlabel("Time (s)")
+            self.ax1.set_ylabel(self.dataAD4020)
+            self.ax2.set_xlabel("Time (s)")
+            self.ax2.set_ylabel(self.dataLTC2500)
+            self.ax3.set_xlabel("Time (s)")
+            self.ax3.set_ylabel(self.dataInternal)
+        else:
+            self.ax1.set_xlabel(self.dataAD4020)
+            self.ax1.set_ylabel("Data frequency")
+            self.ax2.set_xlabel(self.dataLTC2500)
+            self.ax2.set_ylabel("Data frequency")
+            self.ax3.set_xlabel(self.dataInternal)
+            self.ax3.set_ylabel("Data frequency")
+    
+    # Callback function for changing the view type to Hist. (auto)
+    def handle_viewHistogramAuto(self, event):
+        self.viewType.set("Hist. (auto)")
+        if self.viewTypePrev == self.viewType.get():
+            return
+        self.viewTypePrev = self.viewType.get()
+        self.labelAxes()
+    
+    # Callback function for changing the view type to Hist. (bin=1)
+    def handle_viewHistogramOne(self, event):
+        self.viewType.set("Hist. (bin=1)")
+        if self.viewTypePrev == self.viewType.get():
+            return
+        self.viewTypePrev = self.viewType.get()
+        self.labelAxes()
+    
+    # Callback function for changing the view type to time series
+    def handle_viewTimeSeries(self, event):
+        self.viewType.set("Time series")
+        if self.viewTypePrev == self.viewType.get():
+            return
+        self.viewTypePrev = self.viewType.get()
+        self.ax1.cla()
+        self.ax2.cla()
+        self.ax3.cla()
+        self.line1, = self.ax1.plot(self.x, self.data[0], 'b-', label='AD4020 voltage')
+        self.line2, = self.ax2.plot(self.x, self.data[1], 'b-', label='LTC2500 voltage')
+        self.line3, = self.ax3.plot(self.x, self.data[2], 'b-', label='Internal ADC voltage')
+        self.labelAxes()
+        self.updateTimeAxes()
     
     # Updates the time axes for data plots
     def updateTimeAxes(self):
@@ -591,8 +732,7 @@ class DisplayDSMVGUI:
         self.flank.set("Falling")
         self.port.writeL('set flank ' + str(self.flank.get()))
 
-    # Function that handles reading and displaying data from the serial port
-    def readDisp(self):
+    def checkConnection(self):
         # Prepare for restoring settings on reconnect
         if self.port.disconnected() and not self.disconnected:
             self.disconnected = True
@@ -600,23 +740,32 @@ class DisplayDSMVGUI:
             self.reading = False
             self.controlFrame.grid_forget()
             self.waitLabel.configure(text="Connection Lost")
-            self.waitLabel.grid(row=0, column=0, sticky="WE")
+            self.waitLabel.grid(row=0, column=0, columnspan=2, sticky="WE")
             self.window.update_idletasks()
-            self.window.after(0, self.readDisp)
         elif self.disconnected and self.port.disconnected():
             self.window.update_idletasks()
-            self.window.after(0, self.readDisp)
         # Restore settings on reconnect
         if self.disconnected and not self.port.disconnected():
             time.sleep(0.01)
             self.updateAll(False)
             self.waitLabel.grid_forget()
-            L.buildUI()
+            L.buildUI(self.uiElements, self.uiGridParams)
             self.window.update_idletasks()
             self.disconnected = False
-            self.reading = self.reactivate
-        # Do nothing if the button to start the program hasn't been pressed yet or the port is bein initialized
+            self.handle_switchRead(event=0)
+            if self.reactivate:
+                pass
+                #self.handle_switchRead()
         if not self.reading:
+            self.window.after(1, self.checkConnection)
+    
+    # Function that handles reading and displaying data from the serial port
+    def readDisp(self):
+        self.execRead = True
+        self.checkConnection()
+        # Do nothing if the button to start the program hasn"t been pressed yet or the port is being initialized
+        if not self.reading:
+            self.execRead = False
             return
         # Read data from the serial port (if enough is available)
         # Read raw values
@@ -631,20 +780,40 @@ class DisplayDSMVGUI:
             self.data[1] = values[self.dataSize:2*self.dataSize]
             self.data[2] = values[2*self.dataSize:3*self.dataSize]
             # Display the values
-            self.line1.set_ydata(self.data[0])
-            self.line2.set_ydata(self.data[1])
-            self.line3.set_ydata(self.data[2])
+            if self.viewType.get() == "Time series":
+                self.line1.set_ydata(self.data[0])
+                self.line2.set_ydata(self.data[1])
+                self.line3.set_ydata(self.data[2])
+                self.line1.set_label(self.dataAD4020)
+                self.line2.set_label(self.dataLTC2500)
+                self.line3.set_label(self.dataInternal)
+            elif self.viewType.get() == "Hist. (auto)":
+                self.ax1.cla()
+                self.ax2.cla()
+                self.ax3.cla()
+                self.line1 = self.ax1.hist(self.data[0], histtype='step', label=self.dataAD4020)
+                self.line2 = self.ax2.hist(self.data[1], histtype='step', label=self.dataLTC2500)
+                self.line3 = self.ax3.hist(self.data[2], histtype='step', label=self.dataInternal)
+            elif self.viewType.get() == "Hist. (bin=1)":
+                self.ax1.cla()
+                self.ax2.cla()
+                self.ax3.cla()
+                self.line1 = self.ax1.hist(self.data[0], bins=np.arange(min(self.data[0]), max(self.data[0]) + 2, 1), histtype='step', label=self.dataAD4020)
+                self.line2 = self.ax2.hist(self.data[1], bins=np.arange(min(self.data[1]), max(self.data[1]) + 2, 1), histtype='step', label=self.dataLTC2500)
+                self.line3 = self.ax3.hist(self.data[2], bins=np.arange(min(self.data[2]), max(self.data[2]) + 2, 1), histtype='step', label=self.dataInternal)
+            # Update the legends
+            self.legend1 = self.ax1.legend(loc='upper right', title="Average: %.6f%s \nStandard deviation: %.8f%s" %(np.mean(self.data[0]), self.unit, np.std(self.data[0]), self.unit))
+            self.legend2 = self.ax2.legend(loc='upper right', title="Average: %.6f%s \nStandard deviation: %.8f%s" %(np.mean(self.data[1]), self.unit, np.std(self.data[1]), self.unit))
+            self.legend3 = self.ax3.legend(loc='upper right', title="Average: %.6f%s \nStandard deviation: %.8f%s" %(np.mean(self.data[2]), self.unit, np.std(self.data[2]), self.unit))
+            self.legend1.get_title().set_multialignment('center')
+            self.legend2.get_title().set_multialignment('center')
+            self.legend3.get_title().set_multialignment('center')
+            # Label axes correctly
+            self.labelAxes()
             # Update the canvases
             L.updateCanvas(self.fig1, self.ax1, False, True)
             L.updateCanvas(self.fig2, self.ax2, False, True)
             L.updateCanvas(self.fig3, self.ax3, False, True)
-            # Update the legends
-            self.legend1 = self.ax1.legend(loc='upper right', title="Average: %.3fV \nStandard deviation: %.8fV" %(np.mean(self.data[0]), np.std(self.data[0])))
-            self.legend2 = self.ax2.legend(loc='upper right', title="Average: %.3fV \nStandard deviation: %.8fV" %(np.mean(self.data[1]), np.std(self.data[1])))
-            self.legend3 = self.ax3.legend(loc='upper right', title="Average: %.3fV \nStandard deviation: %.8fV" %(np.mean(self.data[2]), np.std(self.data[2])))
-            self.legend1.get_title().set_multialignment('center')
-            self.legend2.get_title().set_multialignment('center')
-            self.legend3.get_title().set_multialignment('center')
         self.window.update_idletasks()
         # Reschedule function (this is probably not the best solution)
         self.window.after(0, self.readDisp)
@@ -653,14 +822,15 @@ class DisplayDSMVGUI:
     def handle_switchRead(self, event):
         if self.reading:
             self.reading = False
-            self.readSwitch['text']="Pause              "
+            self.readSwitch['text'] = "Run                "
+            self.readLabel['text'] = "Paused"
             self.window.update_idletasks()
         else:
-            self.port.clearBuffer()
-            self.readSwitch['text']="                Run"
+            self.window.after(0, self.readDisp)
+            self.readSwitch['text'] = "           Pause"
+            self.readLabel['text'] = "Running"
             self.window.update_idletasks()
             self.reading = True
-            self.window.after(0, self.readDisp)
     
     # Callback for the stop button
     def stop(self, event):
