@@ -18,11 +18,13 @@
  *	
  *	@author Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
  *	@author Philipp Rahe (prahe@uos.de)
- *	@date 06.01.2021
- *	@version 2.1
+ *	@date 06.05.2022
+ *	@version 2.2.1
  *	
  *	@par Changelog
- *		- 06.01.2022 :	Added documentation on external definitions
+ *		- 06.05.2022: Added note on using T4dw() for timing purposes
+ *		- 31.03.2022: Fixed a bug that caused commands via USB to be evaluated before the newline character
+ *		- 06.01.2022: Added documentation on external definitions
  *		- 08.06.2021: integrated buffer for 32-bit data types
  *		- 26.05.2021: updated documentation to include byte macros
  *		- 17.05.2021: documentation translated into English
@@ -175,6 +177,10 @@ void T4aravg(int samples);
 float T4arV(int pin);
 
 /**	@brief Writes a digital value to a given pin as fast as possible.
+ *  
+ *  Note on using this for timing with LEDs on the DSMV-Board:
+ *	If one measures the time between the pin starting to rise and starting to fall,
+ *	subtract 17 cycles from that to get the time it takes to execute the statement between those.
  *	
  *	@param pin Number of the pin to write to.
  *	@param value Value to be written (HIGH or LOW).
