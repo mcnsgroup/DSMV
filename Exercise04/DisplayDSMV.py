@@ -5,10 +5,16 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 03.05.2022, ver1.7.1
+# 06.05.2022, ver1.8
 # 
 # Changelog
-#   - 03.05.2022: Moved entry box processing to DSMVLib module
+#   - 06.05.2022: Added functionality to show raw values,
+#                 added functionality to show data as histograms,
+#                 increased maximum oversampling to 65536,
+#                 added indicator for time/series,
+#                 minor design changes
+#   - 03.05.2022: Moved entry box processing to DSMVLib module, 
+#                 changed save label to unicode symbol
 #   - 27.04.2022: Changed building of the GUI to modular function from DSMVLib,
 #                 added version indicator in GUI,
 #                 added functionality to save plot data as plain text,
