@@ -4,9 +4,11 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 06.05.2022, ver1.8
+# 09.05.2022, ver1.8.1
 # 
 # Changelog
+#   - 09.05.2022: Added functionality to update entry boxes on keypad return key and focus out,
+#                 fixied a bug causing the parameters to not update properly when in histogram mode
 #   - 06.05.2022: Added functionality to show raw values,
 #                 added functionality to show data as histograms,
 #                 increased maximum oversampling to 65536,
@@ -97,7 +99,7 @@ class DisplayDSMVGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 04\nv1.8")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 04\nv1.8.1")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -132,6 +134,8 @@ class DisplayDSMVGUI:
         self.uiElements.append(self.freqEntry)
         self.uiGridParams.append([0, 1, 1, 1, "WE"])
         self.freqEntry.bind("<Return>", self.handle_updateFreq)
+        self.freqEntry.bind("<KP_Enter>", self.handle_updateFreq)
+        self.freqEntry.bind("<FocusOut>", self.handle_updateFreq)
         # Minimum samplerate
         self.samplerateMin = 1
         # Maximum samplerate
@@ -148,6 +152,8 @@ class DisplayDSMVGUI:
         self.uiElements.append(self.sizeEntry)
         self.uiGridParams.append([1, 1, 1, 1, "WE"])
         self.sizeEntry.bind("<Return>", self.handle_updateSize)
+        self.sizeEntry.bind("<KP_Enter>", self.handle_updateSize)
+        self.sizeEntry.bind("<FocusOut>", self.handle_updateSize)
         # Minimum data size
         self.dataSizeMin = 1
         # Maximum data size
@@ -164,6 +170,8 @@ class DisplayDSMVGUI:
         self.uiElements.append(self.oversEntry)
         self.uiGridParams.append([2, 1, 1, 1, "WE"])
         self.oversEntry.bind("<Return>", self.handle_updateOvers)
+        self.oversEntry.bind("<KP_Enter>", self.handle_updateOvers)
+        self.oversEntry.bind("<FocusOut>", self.handle_updateOvers)
         # Minimum oversamples
         self.oversMin = 1
         # Maximum oversamples
@@ -565,10 +573,11 @@ class DisplayDSMVGUI:
             self.dataSize = newSize
             # Write command to serial port
             self.port.writeL('set dataSize ' + str(self.dataSize))
-            # Update the data of the plots
-            self.line1.set_ydata(self.data[0])
-            self.line2.set_ydata(self.data[1])
-            self.line3.set_ydata(self.data[2])
+            # Update the data of the plots (if applicable)
+            if self.viewType.get() == "Time series":
+                self.line1.set_ydata(self.data[0])
+                self.line2.set_ydata(self.data[1])
+                self.line3.set_ydata(self.data[2])
             self.updateTimeAxes()
             # Clear serial buffer
             self.port.clearBuffer()
@@ -691,14 +700,16 @@ class DisplayDSMVGUI:
         tMax = (self.dataSize-1)*self.oversamples/self.samplerate
         # Update values for time axes
         self.x = np.linspace(0, tMax, self.dataSize)
-        # Update the axes
-        self.line1.set_xdata(self.x)
-        self.line2.set_xdata(self.x)
-        self.line3.set_xdata(self.x)
-        # Set time axes scale
-        self.ax1.set_xlim([0, tMax])
-        self.ax2.set_xlim([0, tMax])
-        self.ax3.set_xlim([0, tMax])
+        # Update the data of the plots (if applicable)
+        if self.viewType.get() == "Time series":
+            # Update the axes
+            self.line1.set_xdata(self.x)
+            self.line2.set_xdata(self.x)
+            self.line3.set_xdata(self.x)
+            # Set time axes scale
+            self.ax1.set_xlim([0, tMax])
+            self.ax2.set_xlim([0, tMax])
+            self.ax3.set_xlim([0, tMax])
         # Update the canvases
         L.updateCanvas(self.fig1, self.ax1, False, True)
         L.updateCanvas(self.fig2, self.ax2, False, True)
