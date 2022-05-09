@@ -5,9 +5,11 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 06.05.2022, ver1.8
+# 09.05.2022, ver1.8.1
 # 
 # Changelog
+#   - 09.05.2022: Added functionality to update entry boxes on keypad return key and focus out,
+#                 fixied a bug causing the parameters to not update properly when in histogram mode
 #   - 06.05.2022: Added functionality to show raw values,
 #                 added functionality to show data as histograms,
 #                 increased maximum oversampling to 65536,
