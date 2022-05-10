@@ -4,9 +4,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 03.05.2022, ver1.6.2
+# 10.05.2022, ver1.7
 # 
 # Changelog
+#   - 10.05.2022: Added functionality to display the values of a point clicked on the plots
 #   - 03.05.2022: Moved entry box processing to DSMVLib module,
 #                 greatly improved performance of histograms
 #   - 27.04.2022: Shortened entry boxes to fit on smaller screens
@@ -122,7 +123,7 @@ class RTDTempGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 03\nv1.6.2")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 03\nv1.7")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -229,6 +230,7 @@ class RTDTempGUI:
         self.uiGridParams.append([0, 1, 1, 1, "WE"])
         self.urefEntry.bind("<Return>", self.handle_updateUref)
         self.urefEntry.bind("<KP_Enter>", self.handle_updateUref)
+        self.urefEntry.bind("<FocusOut>", self.handle_updateUref)
         # Minimum refrence voltage
         self.urefMin = 1
         # Maximum refrence voltage
@@ -246,6 +248,7 @@ class RTDTempGUI:
         self.uiGridParams.append([1, 1, 1, 1, "WE"])
         self.IRTDEntry.bind("<Return>", self.handle_updateIRTD)
         self.IRTDEntry.bind("<KP_Enter>", self.handle_updateIRTD)
+        self.IRTDEntry.bind("<FocusOut>", self.handle_updateIRTD)
         # Minimum RTD current
         self.IRTDMin = 0
         # Maximum RTD current
@@ -263,6 +266,7 @@ class RTDTempGUI:
         self.uiGridParams.append([2, 1, 1, 1, "WE"])
         self.offsetEntry.bind("<Return>", self.handle_updateOffset)
         self.offsetEntry.bind("<KP_Enter>", self.handle_updateOffset)
+        self.offsetEntry.bind("<FocusOut>", self.handle_updateOffset)
         # Minimum offset
         self.offsetMin = -10
         # Maximum offset
@@ -280,6 +284,7 @@ class RTDTempGUI:
         self.uiGridParams.append([3, 1, 1, 1, "WE"])
         self.R0Entry.bind("<Return>", self.handle_updateR0)
         self.R0Entry.bind("<KP_Enter>", self.handle_updateR0)
+        self.R0Entry.bind("<FocusOut>", self.handle_updateR0)
         # Minimum R0
         self.R0Min = 1
         # Maximum R0
@@ -297,6 +302,7 @@ class RTDTempGUI:
         self.uiGridParams.append([0, 3, 1, 1, "WE"])
         self.R2Entry.bind("<Return>", self.handle_updateR2)
         self.R2Entry.bind("<KP_Enter>", self.handle_updateR2)
+        self.R2Entry.bind("<FocusOut>", self.handle_updateR2)
         # Minimum R2
         self.R2Min = 1
         # Maximum R2
@@ -314,6 +320,7 @@ class RTDTempGUI:
         self.uiGridParams.append([1, 3, 1, 1, "WE"])
         self.R3Entry.bind("<Return>", self.handle_updateR3)
         self.R3Entry.bind("<KP_Enter>", self.handle_updateR3)
+        self.R3Entry.bind("<FocusOut>", self.handle_updateR3)
         # Minimum R3
         self.R3Min = 1
         # Maximum R3
@@ -331,6 +338,7 @@ class RTDTempGUI:
         self.uiGridParams.append([2, 3, 1, 1, "WE"])
         self.RGainEntry.bind("<Return>", self.handle_updateRGain)
         self.RGainEntry.bind("<KP_Enter>", self.handle_updateRGain)
+        self.RGainEntry.bind("<FocusOut>", self.handle_updateRGain)
         # Minimum gain resitor
         self.RGainMin = 1
         # Maximum gain resistor
@@ -379,16 +387,8 @@ class RTDTempGUI:
         canvas1.draw()
         self.uiElements.append(canvas1.get_tk_widget())
         self.uiGridParams.append([1, 0, 1, 2, "NESW"])
-        canvas1.get_tk_widget().bind('<Button-1>', self.handle_clickCanvas1)
-        #plt.connect('button_press_event', self.handle_clickCanvas1)
-        self.annotation = self.ax1.annotate('x: %0.2f\ny: %0.2f' %(0, 0), 
-            xy=(0, 0), xytext=(10, 15),
-            textcoords='offset points',
-            bbox=dict(alpha=0.5),
-            arrowprops=dict(arrowstyle='->')
-        )
-        self.annotation.set_visible(False)
-        #self.annotation.bind('<Button-1>', self.hideAnnotation1)
+        # Create data tip for canvas 1
+        self.dataTip1 = L.dataTip(canvas1, self.ax1, self.line1, 0.01)
         # Create frame for saving the plot
         self.saveFrame1 = Frame()
         self.uiElements.append(self.saveFrame1)
@@ -433,6 +433,8 @@ class RTDTempGUI:
         canvas2.draw()
         self.uiElements.append(canvas2.get_tk_widget())
         self.uiGridParams.append([2, 0, 1, 2, "NESW"])
+        # Create data tip for canvas 2
+        self.dataTip2 = L.dataTip(canvas2, self.ax2, self.line2, 0.01)
         # Create frame for saving the plot
         self.saveFrame2 = Frame()
         self.uiElements.append(self.saveFrame2)
@@ -711,21 +713,6 @@ class RTDTempGUI:
         self.RGainV.set(str(self.RGain))
         self.window.update_idletasks()
     
-    # Event handler for clicking on canvas 1
-    def handle_clickCanvas1(self, event=0):
-        L.pln("Plot was clicked")
-        x, y = event.x, event.y
-        self.annotation.remove()
-        self.annotation = self.ax1.annotate('x: %0.2f\ny: %0.2f' %(x, y), 
-            xy=(0, 0), xytext=(10, 15),
-            textcoords='offset points',
-            bbox=dict(alpha=0.5),
-            arrowprops=dict(arrowstyle='->')
-        )
-    
-    def hideAnnotation1(self, event=0):
-        self.annotation.set_visible(False)
-    
     # Checks whether the board is still connected and acts accordingly
     def checkConnection(self):
         # Prepare for restoring settings on reconnect
@@ -796,7 +783,7 @@ class RTDTempGUI:
             self.legend1 = self.ax1.legend(loc="upper left", title="Last value: %.2f" %self.data[0][len(self.data[0])-1])
             # Label axes correctly
             self.labelAxes()
-            L.updateCanvas(self.fig1, self.ax1)
+            L.updateCanvas(self.fig1.canvas, self.ax1)
             if len(status) == 2:
                 if self.viewType.get() == "Time series":
                     self.line2.set_xdata(self.x)
@@ -811,7 +798,7 @@ class RTDTempGUI:
                 self.legend2 = self.ax2.legend(loc="upper left", title="Last value: %.2f" %self.data[1][len(self.data[1])-1])
                 # Label axes correctly
                 self.labelAxes()
-                L.updateCanvas(self.fig2, self.ax2)
+                L.updateCanvas(self.fig2.canvas, self.ax2)
         
         # Reschedule function (this is probably not the best solution)
         self.window.after(0, self.readDisp)
