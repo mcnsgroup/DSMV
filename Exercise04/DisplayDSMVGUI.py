@@ -4,9 +4,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 09.05.2022, ver1.8.1
+# 10.05.2022, ver1.9
 # 
 # Changelog
+#   - 10.05.2022: Added functionality to display the values of a point clicked on the plots
 #   - 09.05.2022: Added functionality to update entry boxes on keypad return key and focus out,
 #                 fixied a bug causing the parameters to not update properly when in histogram mode
 #   - 06.05.2022: Added functionality to show raw values,
@@ -99,7 +100,7 @@ class DisplayDSMVGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 04\nv1.8.1")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 04\nv1.9")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -332,6 +333,8 @@ class DisplayDSMVGUI:
         canvas1.draw()
         self.uiElements.append(canvas1.get_tk_widget())
         self.uiGridParams.append([1, 0, 1, 2, "NESW"])
+        # Create data tip for canvas 1
+        self.dataTip1 = L.dataTip(canvas1, self.ax1, self.line1, 0.01)
         # Create frame for saving the plot
         self.saveFrame1 = Frame()
         self.uiElements.append(self.saveFrame1)
@@ -376,6 +379,8 @@ class DisplayDSMVGUI:
         canvas2.draw()
         self.uiElements.append(canvas2.get_tk_widget())
         self.uiGridParams.append([2, 0, 1, 2, "NESW"])
+        # Create data tip for canvas 1
+        self.dataTip2 = L.dataTip(canvas2, self.ax2, self.line2, 0.01)
         # Create frame for saving the plot
         self.saveFrame2 = Frame()
         self.uiElements.append(self.saveFrame2)
@@ -420,6 +425,8 @@ class DisplayDSMVGUI:
         canvas3.draw()
         self.uiElements.append(canvas3.get_tk_widget())
         self.uiGridParams.append([3, 0, 1, 2, "NESW"])
+        # Create data tip for canvas 1
+        self.dataTip3 = L.dataTip(canvas3, self.ax3, self.line3, 0.01)
         # Create frame for saving the plot
         self.saveFrame3 = Frame()
         self.uiElements.append(self.saveFrame3)
@@ -711,9 +718,9 @@ class DisplayDSMVGUI:
             self.ax2.set_xlim([0, tMax])
             self.ax3.set_xlim([0, tMax])
         # Update the canvases
-        L.updateCanvas(self.fig1, self.ax1, False, True)
-        L.updateCanvas(self.fig2, self.ax2, False, True)
-        L.updateCanvas(self.fig3, self.ax3, False, True)
+        L.updateCanvas(self.fig1.canvas, self.ax1, False, True)
+        L.updateCanvas(self.fig2.canvas, self.ax2, False, True)
+        L.updateCanvas(self.fig3.canvas, self.ax3, False, True)
     
     # Event handler for trigger source selector
     def handle_updateTriggerSource(self, event=0):
@@ -822,9 +829,9 @@ class DisplayDSMVGUI:
             # Label axes correctly
             self.labelAxes()
             # Update the canvases
-            L.updateCanvas(self.fig1, self.ax1, False, True)
-            L.updateCanvas(self.fig2, self.ax2, False, True)
-            L.updateCanvas(self.fig3, self.ax3, False, True)
+            L.updateCanvas(self.fig1.canvas, self.ax1, False, True)
+            L.updateCanvas(self.fig2.canvas, self.ax2, False, True)
+            L.updateCanvas(self.fig3.canvas, self.ax3, False, True)
         self.window.update_idletasks()
         # Reschedule function (this is probably not the best solution)
         self.window.after(0, self.readDisp)
