@@ -5,9 +5,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 09.05.2022, ver1.8.1
+# 10.05.2022, ver1.9
 # 
 # Changelog
+#   - 10.05.2022: Added functionality to display the values of a point clicked on the plots
 #   - 09.05.2022: Added functionality to update entry boxes on keypad return key and focus out,
 #                 fixied a bug causing the parameters to not update properly when in histogram mode
 #   - 06.05.2022: Added functionality to show raw values,
