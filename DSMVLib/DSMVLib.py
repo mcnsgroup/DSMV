@@ -1,5 +1,8 @@
-# Version 0.2.10
+# Version 0.2.11
 # Changelog
+#	- 10.05.2022: Added functionality for data tips
+#				  added functionality for calculating euclidian distances,
+#				  added functionality for getting the closest point in an n-dimensional data set to given coordinates using a summation norm
 #   - 29.04.2022: Removed unnecessary elements from vertical toolbar,
 #                 added functionality to convert a string to a number with respect to German point notation
 #   - 26.04.2022: Added function to enumerate files
@@ -42,7 +45,7 @@
 import serial
 import time
 import tkinter as tk
-
+import numpy as np
 
 import matplotlib.figure as fig
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
@@ -66,8 +69,131 @@ def pln(*args):
         p(args[0])
     print()
 
+# Calculates the euklidian distance between two points
+# 
+# If one point has fewer coordinates than the other, they will be padded with zeros
+# 
+# @param point1 Coordinates of the first point
+# @param point2 Coordinates of the second point
+# @return distance between the points
+def distance(point1, point2):
+	n = max(len(point1), len(point2))
+	point1 = point1 + [0] * (n - len(point1))
+	point2 = point2 + [0] * (n - len(point2))
+	squareSum = 0
+	for i in range(0, n):
+		squareSum += pow((point2[i] - point1[i]), 2)
+	dist = np.sqrt(squareSum)
+	return dist
+
+# Calculates the distance between two points using a summation norm with a customizable unit rhomboid
+# 
+# If one point has fewer coordinates than the other, they will be padded with zeros
+# 
+# @param point1 Coordinates of the first point
+# @param point2 Coordinates of the second point
+# @param unit Dimensions of the unit cuboid
+# @return distance between the points
+def distanceSum(point1, point2, unit=[1]):
+	# Treat all invalid numbers for the unit cuboid as 1
+	for i in range(0, len(unit)):
+		if unit[i] <= 0:
+			unit[i] = 1
+	n = max(len(point1), len(point2))
+	# Possibly pad inputs
+	point1 = point1 + [0] * (n - len(point1))
+	point2 = point2 + [0] * (n - len(point2))
+	unit = unit + [1] * (n - len(unit))
+	# Calculate the distance
+	sumDist = 0
+	for i in range(0, n):
+		sumDist += abs(point2[i] - point1[i]) / unit[i]
+	return sumDist
+
+# Finds the closest point in an n-dimensional data set to given coordinates in range using a summation norm
+# 
+# The area searched for the nearest point is a rhomboid
+# 
+# @param point
+# @param data Data set for coordinates to compare against
+# @param dist Array with the maximum distance on the respective axis allowed for the resulting point; ignored if < 0
+# @return index of the point closest to the coordinates
+def closestPoint(point, data, dist=[-1]):
+	# Ensure that the data sets have the same length
+	N = len(data[0])
+	for i in range(1, len(data)):
+		if len(data[i]) != N:
+			pln("Data set subarrays must have the same length!")
+			return None
+	index = None
+	curDist = 1
+	for i in range(0, N):
+		dataPoint = [r[i] for r in data]
+		pointDist = distanceSum(point, dataPoint, dist)
+		if pointDist <= curDist:
+			index = i
+			curDist = pointDist
+	return index
+
+# Displays the x- and y-value of a point in a plot on a canvas on a mouse click
+class dataTip:
+	# Constructor method
+	# 
+	# @param canvas Canvas to bind data tip to
+	# @param ax Axis on the canvas to bind data tip to
+	# @param line Plot in the axis to bind data tip to
+	# @param dist Maximum distance from plot data to recognize a click as plot size fraction
+	def __init__(self, canvas, ax, line, dist):
+		# Initialize variables
+		self.canvas = canvas
+		self.ax = ax
+		self.line = line
+		self.dist = dist
+		self.x1 = 0
+		self.y1 = 0
+		
+		# Create annotation
+		self.annotation = 0
+		self.drawAnnotation()
+		self.annotation.set_visible(False)
+		self.annotated = False
+		
+		# Bind the click on the canvas
+		canvas.mpl_connect('button_press_event', self.handle_clickCanvas)
+
+	# (Re-) Draws the annotation
+	def drawAnnotation(self):
+		self.annotation = self.ax.annotate('x: %0.2f\ny: %0.2f' %(self.x1, self.y1), 
+		    xy=(self.x1, self.y1), xytext=(10, 15),
+		    textcoords='offset points',
+		    bbox=dict(alpha=0.5),
+		    arrowprops=dict(arrowstyle='->')
+		)
+		self.annotated = True
+
+	# Event handler for clicking on the canvas
+	def handle_clickCanvas(self, event):
+		if self.annotated:
+			self.annotation.remove()
+			self.annotated = False
+		else:
+			xL = self.ax.get_xlim()
+			yL = self.ax.get_ylim()
+			xSpan = xL[1] - xL[0]
+			ySpan = yL[1] - yL[0]
+			xData = self.line.get_xdata()
+			yData = self.line.get_ydata()
+			widget = self.canvas.get_tk_widget()
+			sizeFac = widget.winfo_height() / widget.winfo_width()
+			index = closestPoint([event.xdata, event.ydata], [xData, yData], [self.dist*xSpan, self.dist*ySpan/sizeFac])
+			if index != None:
+				self.x1, self.y1 = self.line.get_xdata()[index], self.line.get_ydata()[index]
+				self.drawAnnotation()
+		updateCanvas(self.canvas, self.ax, False, True)
+
 # Converts a string into a float (if possible) with respect to German point notation
-# @param a String to be convertet
+# 
+# @param a String to be converted
 # @return number (None if input string isn't a number)
 def toFloat(a):
     # replace all "," characters with "." to convert German notation to international standard
@@ -106,7 +232,7 @@ def savePath(name, dir):
 window = None
 
 # Updates a canvas with axis in it
-def updateCanvas(fig, ax, rescaleX=True, rescaleY=True):
+def updateCanvas(canvas, ax, rescaleX=True, rescaleY=True):
     # store previous axes limits
     xl = ax.get_xlim()
     yl = ax.get_ylim()
@@ -119,9 +245,9 @@ def updateCanvas(fig, ax, rescaleX=True, rescaleY=True):
     if not rescaleY:
         ax.set_xlim(yl)
     # Update canvas
-    fig.canvas.draw()
+    canvas.draw()
     # Flush events (if this was called by a tkinter event)
-    fig.canvas.flush_events()
+    canvas.flush_events()
 
 # Function to build a GUI using the grid manager
 # 
