@@ -5,9 +5,17 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 03.05.2022, ver1.4.1
+# 13.05.2022, ver1.6
 # 
 # Changelog
+#   - 13.05.2022: Merged features with SpectralProcessingGUI.py,
+#                 added data tip for maximum in spectrum,
+#                 added entry box and switch for custom number of frequencies,
+#                 added functionality to display the values of a point clicked on the plots
+#                 added functionality to update entry boxes on keypad return key and focus out,
+#                 decreased maximum sampling- and processingrate from 90000 to 80000Hz
+#                 fixed a bug that caused the serial buffer to overflow,
+#                 UI appearance changes
 #   - 03.05.2022: Moved entry box processing to DSMVLib module,
 #                 added version indicator in GUI
 #   - 27.01.2022: Added functionality for saving plots as vector images
