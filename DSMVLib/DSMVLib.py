@@ -1,5 +1,7 @@
-# Version 0.2.11
+# Version 0.2.13
 # Changelog
+#	- 16.05.2022: Added functionality to disable data tip via function
+#	- 12.05.2022: Added option for background color to data tip
 #	- 10.05.2022: Added functionality for data tips
 #				  added functionality for calculating euclidian distances,
 #				  added functionality for getting the closest point in an n-dimensional data set to given coordinates using a summation norm
@@ -136,6 +138,8 @@ def closestPoint(point, data, dist=[-1]):
 	return index
 
 # Displays the x- and y-value of a point in a plot on a canvas on a mouse click
+# 
+# Possiple to do: Find a solution for plots with logarithmic scaling
 class dataTip:
 	# Constructor method
 	# 
@@ -143,14 +147,18 @@ class dataTip:
 	# @param ax Axis on the canvas to bind data tip to
 	# @param line Plot in the axis to bind data tip to
 	# @param dist Maximum distance from plot data to recognize a click as plot size fraction
-	def __init__(self, canvas, ax, line, dist):
+	# @param faceColor Background color of the annotation
+	# @param textColor Text color of the annotation
+	def __init__(self, canvas, ax, line, dist, faceColor="w"):
 		# Initialize variables
 		self.canvas = canvas
 		self.ax = ax
 		self.line = line
 		self.dist = dist
+		self.faceColor = faceColor
 		self.x1 = 0
 		self.y1 = 0
+		self.enabled = tk.NORMAL
 		
 		# Create annotation
 		self.annotation = 0
@@ -166,30 +174,42 @@ class dataTip:
 		self.annotation = self.ax.annotate('x: %0.2f\ny: %0.2f' %(self.x1, self.y1), 
 		    xy=(self.x1, self.y1), xytext=(10, 15),
 		    textcoords='offset points',
-		    bbox=dict(alpha=0.5),
+		    bbox=dict(alpha=0.5, fc=self.faceColor),
 		    arrowprops=dict(arrowstyle='->')
 		)
 		self.annotated = True
 
-	# Event handler for clicking on the canvas
-	def handle_clickCanvas(self, event):
-		if self.annotated:
+	# En- or disables the data tip
+	# 
+	# @param state Indicates whether to en- or disable the data tip (can be NORMAL or DISABLED)
+	def setState(self, state):
+		if state == tk.NORMAL:
+			self.enabled = state
+		elif state == tk.DISABLED:
+			self.enabled = state
 			self.annotation.remove()
 			self.annotated = False
-		else:
-			xL = self.ax.get_xlim()
-			yL = self.ax.get_ylim()
-			xSpan = xL[1] - xL[0]
-			ySpan = yL[1] - yL[0]
-			xData = self.line.get_xdata()
-			yData = self.line.get_ydata()
-			widget = self.canvas.get_tk_widget()
-			sizeFac = widget.winfo_height() / widget.winfo_width()
-			index = closestPoint([event.xdata, event.ydata], [xData, yData], [self.dist*xSpan, self.dist*ySpan/sizeFac])
-			if index != None:
-				self.x1, self.y1 = self.line.get_xdata()[index], self.line.get_ydata()[index]
-				self.drawAnnotation()
-		updateCanvas(self.canvas, self.ax, False, True)
+	
+	# Event handler for clicking on the canvas
+	def handle_clickCanvas(self, event):
+		if self.enabled == tk.NORMAL:
+			if self.annotated:
+				self.annotation.remove()
+				self.annotated = False
+			else:
+				xL = self.ax.get_xlim()
+				yL = self.ax.get_ylim()
+				xSpan = xL[1] - xL[0]
+				ySpan = yL[1] - yL[0]
+				xData = self.line.get_xdata()
+				yData = self.line.get_ydata()
+				widget = self.canvas.get_tk_widget()
+				sizeFac = widget.winfo_height() / widget.winfo_width()
+				index = closestPoint([event.xdata, event.ydata], [xData, yData], [self.dist*xSpan, self.dist*ySpan/sizeFac])
+				if index != None:
+					self.x1, self.y1 = self.line.get_xdata()[index], self.line.get_ydata()[index]
+					self.drawAnnotation()
+			updateCanvas(self.canvas, self.ax, False, True)
 
 # Converts a string into a float (if possible) with respect to German point notation
 # 
