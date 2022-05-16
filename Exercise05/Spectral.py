@@ -5,9 +5,14 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 13.05.2022, ver1.6
+# 16.05.2022, ver1.7
 # 
 # Changelog
+#   - 16.05.2022: Fixed a bug that caused the wrong data to be saved,
+#                 fixed a bug that caused the data tips for the spectra to break 
+#                 after disabling the respective spectrum,
+#                 added option to disable power integrator
+#                 UI appearance changes
 #   - 13.05.2022: Merged features with SpectralProcessingGUI.py,
 #                 added data tip for maximum in spectrum,
 #                 added entry box and switch for custom number of frequencies,
