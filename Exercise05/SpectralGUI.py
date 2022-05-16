@@ -17,9 +17,14 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 13.05.2022, ver1.6
+# 16.05.2022, ver1.7
 # 
 # Changelog
+#   - 16.05.2022: Fixed a bug that caused the wrong data to be saved,
+#                 fixed a bug that caused the data tips for the spectra to break 
+#                 after disabling the respective spectrum,
+#                 added option to disable power integrator
+#                 UI appearance changes
 #   - 13.05.2022: Merged features with SpectralProcessingGUI.py,
 #                 added data tip for maximum in spectrum,
 #                 added entry box and switch for custom number of frequencies,
@@ -66,6 +71,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 # Import official modules
+from csv import Dialect
 import numpy as np
 from matplotlib.pyplot import *
 from matplotlib.figure import Figure
@@ -77,6 +83,7 @@ import struct
 import time
 import glob
 import os
+import math
 # Import custom modules
 from DSMVLib import DSMVLib as L
 
@@ -107,8 +114,8 @@ class SpectralGUI:
         self.oversamplesDefault = 1
         self.oversamples = self.oversamplesDefault
         self.procDefault = 20000.0
-        self.transformSize1 = self.dataSizeDefault
-        self.transformSize2 = self.dataSizeDefault
+        self.transformSize1 = math.floor(self.dataSizeDefault / 2)
+        self.transformSize2 = math.floor(self.dataSizeDefault / 2)
         self.proc = self.procDefault
         self.port.clearBuffer()
         # Initialize data buffer
@@ -293,7 +300,7 @@ class SpectralGUI:
         self.window1 = StringVar()
         self.window2 = StringVar()
         self.window1.set(self.windows[0])
-        self.window2.set(self.windows[0])
+        self.window2.set("Disabled")
         # Create combo box for window selector 1
         self.windowSelect1 = ttk.Combobox(master=self.displaySFrame, values = self.windows, textvariable=self.window1, state="readonly")
         self.uiElements.append(self.windowSelect1)
@@ -325,16 +332,16 @@ class SpectralGUI:
         self.unitSelect.set(self.unitList[0])
         # Initialize transform size status state
         self.transformSizeStatus = StringVar()
-        self.transformSizeStatus.set("N_FT")
+        self.transformSizeStatus.set("N_FT-1=N/2")
         # Create transform size status selector buttons
-        self.N_FTButton = Radiobutton(self.displaySFrame, text="N_FT", variable = self.transformSizeStatus, value = "N_FT")
-        self.uiElements.append(self.N_FTButton)
-        self.uiGridParams.append([4, 0, 1, 1, "E"])
-        self.N_FTButton.bind("<Button-1>", self.handle_customTransform)
-        self.NButton = Radiobutton(self.displaySFrame, text="N", variable = self.transformSizeStatus, value = "N")
+        self.NButton = Radiobutton(self.displaySFrame, text="N_FT-1=N/2", variable = self.transformSizeStatus, value = "N_FT-1=N/2")
         self.uiElements.append(self.NButton)
-        self.uiGridParams.append([4, 1, 1, 1, "W"])
+        self.uiGridParams.append([4, 0, 1, 1, "W"])
         self.NButton.bind("<Button-1>", self.handle_lockedTransform)
+        self.N_FTButton = Radiobutton(self.displaySFrame, text="N_FT-1", variable = self.transformSizeStatus, value = "N_FT-1")
+        self.uiElements.append(self.N_FTButton)
+        self.uiGridParams.append([4, 1, 1, 1, "E"])
+        self.N_FTButton.bind("<Button-1>", self.handle_customTransform)
         # Variable to control content of the transform size 1 entry box
         self.transformSize1V = StringVar()
         self.transformSize1V.set(str(self.transformSize1))
@@ -348,6 +355,7 @@ class SpectralGUI:
         self.transformSize1Entry.bind("<Return>", self.handle_updateTransformSize1)
         self.transformSize1Entry.bind("<KP_Enter>", self.handle_updateTransformSize1)
         self.transformSize1Entry.bind("<FocusOut>", self.handle_updateTransformSize1)
+        self.transformSize1Entry["state"] = DISABLED
         # Create transform size 2 entry box
         self.transformSize2Entry = Entry(master=self.displaySFrame, textvariable=self.transformSize2V, justify=RIGHT)
         self.uiElements.append(self.transformSize2Entry)
@@ -355,10 +363,11 @@ class SpectralGUI:
         self.transformSize2Entry.bind("<Return>", self.handle_updateTransformSize2)
         self.transformSize2Entry.bind("<KP_Enter>", self.handle_updateTransformSize2)
         self.transformSize2Entry.bind("<FocusOut>", self.handle_updateTransformSize2)
+        self.transformSize2Entry["state"] = DISABLED
         # Minimum transform size
         self.transformSizeMin = 1
         # Maximum transform size
-        self.transformSizeMax = 32768
+        self.transformSizeMax = 16384
         # create frame for the run control
         self.runFrame = Frame(master=self.controlFrame, relief=RIDGE, borderwidth=2)
         self.uiElements.append(self.runFrame)
@@ -467,12 +476,10 @@ class SpectralGUI:
         self.spectrum2Removed = False
         # Create axis for phase
         #self.ax3 = self.ax2.twinx()
-        #self.ax3.set_ylabel('Phase') 
-        #self.ax3.tick_params(axis ='y', labelcolor = 'red')
-        # Create phase
-        #self.phase1, = self.ax3.plot(self.f, [0] * (self.freqs1), "r.", label=self.windows[0] + " window phase")
-        
-        
+        #self.ax3.set_ylabel('Phase')
+        # Create phases
+        #self.phase1, = self.ax3.plot(self.f1, [0] * (self.freqs1), "b.", label=self.windows[0] + " window phase")
+        #self.phase2, = self.ax3.plot(self.f2, [0] * (self.freqs2), "r.", label=self.windows[0] + " window phase")
         # Create data tips for the spectra's respective maximum
         self.maxAnnotation1 = self.ax2.annotate('x: %0.2f\ny: %0.2f' %(0, 0), 
 		    xy=(0, 0), xytext=(-50, 15),
@@ -488,7 +495,6 @@ class SpectralGUI:
 		    arrowprops=dict(arrowstyle='->')
 		)
         self.maxAnnotation2.set_visible(False)
-        
         # Start and end frequencies for the signal power integrator
         self.startF = 0
         self.endF = fMax
@@ -500,13 +506,18 @@ class SpectralGUI:
         # Default sacling is logarithmic
         self.ax2.set_yscale("log")
         # Legend for spectral display
-        self.legend = self.ax2.legend(loc='upper right', title="Averaged spectra: 1")
+        #self.legend = self.ax2.legend(loc='upper right', title="Averaged spectra: 1")
         # List of all plots for the legend
-        self.plots = [self.spectrum1, self.spectrum2, self.dots]
+        self.plots = [self.spectrum1, self.spectrum2, self.dots]#, self.phase1, self.phase2]
         # List of all plot titles
-        #self.plotTitles = [self.windows[0] + " window, ENBW: 0Hz", label=self.windows[0] + " window, ENBW: 0Hz", label=self.windows[0] + " window phase", "Modelled phase"]
+        self.plotTitles = [self.windows[0] + " window, ENBW: 0Hz",
+                            self.windows[0] + " window, ENBW: 0Hz",
+                            "Total power in selected band: 0V$^2$"]#,
+                            #self.windows[0] + " window phase",
+                            #self.windows[0] + " window phase"]
         # Legend for frequency-phase diagram
-        #self.legend2 = self.ax3.legend(self.plots, self.plotTitles, loc="upper right", title="Averaged spectra: 1")
+        #self.legend = self.ax3.legend(self.plots, self.plotTitles, loc="upper right", title="Averaged spectra: 1")
+        self.legend = self.ax2.legend(self.plots, self.plotTitles, loc="upper right", title="Averaged spectra: 1")
         # Draw the canvas
         canvas2 = FigureCanvasTkAgg(self.fig2)
         canvas2.draw()
@@ -531,7 +542,7 @@ class SpectralGUI:
         def updateSaveLabel2(event):
             path = L.savePath("Spectrum", self.dir)
             # save the image
-            self.fig1.savefig(path + ".svg")
+            self.fig2.savefig(path + ".svg")
             # save the data as text
             f = open(path + ".txt", mode = "w")
             f.write(str(self.data[0]))
@@ -559,34 +570,51 @@ class SpectralGUI:
         self.powerSFrame = Frame(master=self.powerFrame, relief=RIDGE, borderwidth=2)
         self.uiElements.append(self.powerSFrame)
         self.uiGridParams.append([1, 0, 1, 1, "WE"])
-        self.powerSFrame.columnconfigure((1, 3), weight=1)
+        self.powerSFrame.columnconfigure((3, 5), weight=1)
+        # Initialize power integrator state
+        self.powerState = StringVar()
+        self.powerState.set("Disabled")
+        # Create power integrator state selector buttons
+        self.powerDisable = Radiobutton(self.powerSFrame, text="Disabled", variable = self.powerState, value = "Disabled")
+        self.uiElements.append(self.powerDisable)
+        self.uiGridParams.append([0, 0, 1, 1, "E"])
+        self.powerDisable.bind("<Button-1>", self.handle_disablePower)
+        self.powerEnable = Radiobutton(self.powerSFrame, text="Enabled", variable = self.powerState, value = "Enabled")
+        self.uiElements.append(self.powerEnable)
+        self.uiGridParams.append([0, 1, 1, 1, "W"])
+        self.powerEnable.bind("<Button-1>", self.handle_enablePower)
         # Create label for the start frequency entry box
         self.startFLabel = Label(master=self.powerSFrame, text="Start Frequency")
         self.uiElements.append(self.startFLabel)
-        self.uiGridParams.append([0, 0, 1, 1, ""])
+        self.uiGridParams.append([0, 2, 1, 1, ""])
         # Variable to control content of the start frequency entry box
         self.startFV = DoubleVar()
         self.startFV.set(0)
         # Create start frequency entry box
         self.startFEntry = Entry(master=self.powerSFrame, textvariable=self.startFV, justify=RIGHT)
         self.uiElements.append(self.startFEntry)
-        self.uiGridParams.append([0, 1, 1, 1, "WE"])
+        self.uiGridParams.append([0, 3, 1, 1, "WE"])
         self.startFEntry.bind("<Return>", self.handle_updateStartF)
+        self.startFEntry.bind("<KP_Enter>", self.handle_updateStartF)
+        self.startFEntry.bind("<FocusOut>", self.handle_updateStartF)
         # Create label for the end frequency entry box
         self.endFLabel = Label(master=self.powerSFrame, text="End Frequency")
         self.uiElements.append(self.endFLabel)
-        self.uiGridParams.append([0, 2, 1, 1, ""])
+        self.uiGridParams.append([0, 4, 1, 1, ""])
         # Variable to control content of the end frequency entry box
         self.endFV = DoubleVar()
         self.endFV.set(fMax)
         # Create end frequency entry box
         self.endFEntry = Entry(master=self.powerSFrame, textvariable=self.endFV, justify=RIGHT)
         self.uiElements.append(self.endFEntry)
-        self.uiGridParams.append([0, 3, 1, 1, "WE"])
+        self.uiGridParams.append([0, 5, 1, 1, "WE"])
         self.endFEntry.bind("<Return>", self.handle_updateEndF)
+        self.endFEntry.bind("<KP_Enter>", self.handle_updateEndF)
+        self.endFEntry.bind("<FocusOut>", self.handle_updateEndF)
         self.waitLabel = Label(text="Initializing... ",
                                font=("", 100))
         self.updateAll(True)
+        self.handle_updateWindow2()
         # Display the widgets
         L.buildUI(self.uiElements, self.uiGridParams)
         # Maximize the window
@@ -652,17 +680,19 @@ class SpectralGUI:
                 newSamplerate = self.samplerateMin
             if newSamplerate > self.samplerateMax:
                 newSamplerate = self.samplerateMax
-            # Update variable for samplerate
-            self.samplerate = newSamplerate
-            # Write command to serial port
-            self.port.writeL('set samplerate ' + str(self.samplerate))
-            # Update the time axes
-            self.updateAxes()
-            # Clear serial buffer
-            self.port.clearBuffer()
+            # Only update if the value has actually changed
+            if newSamplerate != self.samplerate:
+                # Update variable for samplerate
+                self.samplerate = newSamplerate
+                # Write command to serial port
+                self.port.writeL('set samplerate ' + str(self.samplerate))
+                # Update the time axes
+                self.updateAxes()
+                # Clear serial buffer
+                self.port.clearBuffer()
         except ValueError:
             pass
-        self.samplerateV.set(str(self.samplerate))#
+        self.samplerateV.set(str(self.samplerate))
         self.window.update_idletasks()
         # Reactivate reading if paused by this function
         if reactivate:
@@ -690,20 +720,22 @@ class SpectralGUI:
             else:
                 self.data = [0]*(newSize - self.dataSize) + self.data
                 #self.data[1] = [0]*(newSize - self.dataSize) + self.data[1]
-            # Update variable for data size
-            self.dataSize = newSize
-            # Write command to serial port
-            self.port.writeL('set dataSize ' + str(self.dataSize))
-            # If transform size entry box is disabled, overwrite the value
-            if self.transformSizeStatus.get() == "N":
-                self.transformSize1 = self.dataSize
-                self.transformSize2 = self.dataSize
-                self.transformSize1V.set(str(self.transformSize1))
-                self.transformSize2V.set(str(self.transformSize2))
-            # Update the axes
-            self.updateAxes()
-            # Clear serial buffer
-            self.port.clearBuffer()
+            # Only update if the value has actually changed
+            if newSize != self.dataSize:
+                # Update variable for data size
+                self.dataSize = newSize
+                # Write command to serial port
+                self.port.writeL('set dataSize ' + str(self.dataSize))
+                # If transform size entry box is disabled, overwrite the value
+                if self.transformSizeStatus.get() == "N_FT-1=N/2":
+                    self.transformSize1 = math.floor(self.dataSize / 2)
+                    self.transformSize2 = math.floor(self.dataSize / 2)
+                    self.transformSize1V.set(str(self.transformSize1))
+                    self.transformSize2V.set(str(self.transformSize2))
+                # Update the axes
+                self.updateAxes()
+                # Clear serial buffer
+                self.port.clearBuffer()
         self.dataSizeV.set(str(self.dataSize))
         self.window.update_idletasks()
         # Reactivate reading if paused by this function
@@ -726,14 +758,16 @@ class SpectralGUI:
                 newOvers = self.oversMin
             if newOvers > self.oversMax:
                 newOvers = self.oversMax
-            # Update variable for oversamples
-            self.oversamples = newOvers
-            # Write command to serial port
-            self.port.writeL('set oversamples ' + str(self.oversamples))
-            # Update the time axes
-            self.updateAxes()
-            # Clear serial buffer
-            self.port.clearBuffer()
+            # Only update if the value has actually changed
+            if newOvers != self.oversamples:
+                # Update variable for oversamples
+                self.oversamples = newOvers
+                # Write command to serial port
+                self.port.writeL('set oversamples ' + str(self.oversamples))
+                # Update the time axes
+                self.updateAxes()
+                # Clear serial buffer
+                self.port.clearBuffer()
         self.oversamplesV.set(str(self.oversamples))
         self.window.update_idletasks()
         # Reactivate reading if paused by this function
@@ -756,14 +790,16 @@ class SpectralGUI:
                 newProc = self.procMin
             if newProc > self.procMax:
                 newProc = self.procMax
-            # Update variable for samplerate
-            self.proc = newProc
-            # Write command to serial port
-            self.port.writeL('set processing rate ' + str(self.proc))
-            # Update the time axes
-            self.updateAxes()
-            # Clear serial buffer
-            self.port.clearBuffer()
+            # Only update if the value has actually changed
+            if newProc != self.proc:
+                # Update variable for samplerate
+                self.proc = newProc
+                # Write command to serial port
+                self.port.writeL('set processing rate ' + str(self.proc))
+                # Update the time axes
+                self.updateAxes()
+                # Clear serial buffer
+                self.port.clearBuffer()
         except ValueError:
             pass
         self.procV.set(str(self.proc))#
@@ -791,8 +827,8 @@ class SpectralGUI:
         fMax = self.samplerate/(2 * self.oversamples)
         # Number of frequencies
         #self.freqs1 = int(np.ceil((self.dataSize+1)/2))
-        self.freqs1 = int(np.ceil((self.transformSize1+1)/2))
-        self.freqs2 = int(np.ceil((self.transformSize2+1)/2))
+        self.freqs1 = self.transformSize1+1
+        self.freqs2 = self.transformSize2+1
         # Update values for frequency axis
         self.f1 = np.linspace(0, fMax, self.freqs1)
         self.f2 = np.linspace(0, fMax, self.freqs2)
@@ -825,15 +861,18 @@ class SpectralGUI:
     # Event handler for window selector 1
     def handle_updateWindow1(self, event=0):
         if self.window1.get() == "Disabled":
-            self.spectrum1.remove()
+            self.spectrum1.set_visible(False)#remove()
             self.maxAnnotation1.set_visible(False)
             self.spectrum1Removed = True
+            self.dataTipSpectrum1.setState(DISABLED)
         else:
             if self.spectrum1Removed:
-                # Recreate spectrum
-                self.spectrum1, = self.ax2.plot(self.f1, self.S1Pre, 'b.-', label=self.windows[0] + " window, ENBW: 0Hz", linewidth=0.5)
+                # Make spectrum visible again
+                self.spectrum1.set_visible(True)
+                #self.spectrum1, = self.ax2.plot(self.f1, self.S1Pre, 'b.-', label=self.windows[0] + " window, ENBW: 0Hz", linewidth=0.5)
                 self.spectrum1Removed = False
                 self.maxAnnotation1.set_visible(True)
+                self.dataTipSpectrum1.setState(NORMAL)
             self.winFunc1 = "Window" + self.window1.get() + "." + "Window" + self.window1.get()
             self.resetYSpectra()
     
@@ -843,12 +882,14 @@ class SpectralGUI:
             self.spectrum2.remove()
             self.spectrum2Removed = True
             self.maxAnnotation2.set_visible(False)
+            self.dataTipSpectrum2.setState(DISABLED)
         else:
             if self.spectrum2Removed:
                 # Recreate spectrum
                 self.spectrum2, = self.ax2.plot(self.f2, self.S2Pre, 'r.-', label=self.windows[0] + " window, ENBW: 0Hz", linewidth=0.5)
                 self.spectrum2Removed = False
                 self.maxAnnotation2.set_visible(True)
+                self.dataTipSpectrum2.setState(NORMAL)
             self.winFunc2 = "Window" + self.window2.get() + "." + "Window" + self.window2.get()
             self.resetYSpectra()
     
@@ -933,13 +974,13 @@ class SpectralGUI:
     def handle_customTransform(self, event):
         self.transformSize1Entry["state"] = NORMAL
         self.transformSize2Entry["state"] = NORMAL
-        self.transformSizeStatus.set("N_FT")
+        self.transformSizeStatus.set("N_FT-1")
 
     # Callback function for changing the y-scale to "Linear"
     def handle_lockedTransform(self, event):
         self.transformSize1Entry["state"] = DISABLED
         self.transformSize2Entry["state"] = DISABLED
-        self.transformSizeStatus.set("N")
+        self.transformSizeStatus.set("N_FT-1=N/2")
         self.handle_updateSize()
     
     # Function that handles reading and displaying data from the serial port
@@ -991,12 +1032,13 @@ class SpectralGUI:
             # Compute fourier transforms
             #X1 = np.multiply(np.fft.fft(x1)[0:self.freqs1], 2/self.dataSize)
             #X2 = np.multiply(np.fft.fft(x2)[0:self.freqs1], 2/self.dataSize)
-            X1 = np.multiply(np.fft.fft(x1, n=self.transformSize1)[0:self.freqs1], 2/self.dataSize)
-            X2 = np.multiply(np.fft.fft(x2, n=self.transformSize2)[0:self.freqs2], 2/self.dataSize)
-            # Possibly average spectra
+            X1 = np.multiply(np.fft.fft(x1, n=(self.transformSize1 - 1) * 2)[0:self.freqs1], 2/self.dataSize)
+            X2 = np.multiply(np.fft.fft(x2, n=(self.transformSize2 - 1) * 2)[0:self.freqs2], 2/self.dataSize)
+            # Possibly average spectra and calculate phases
             if self.averaging.get():
                 self.S1Pre += abs(X1)
                 self.S2Pre += abs(X2)
+                #self.phase1Pre += phase(X1)
                 self.averaged += 1
             else:
                 self.S1Pre = abs(X1)
@@ -1014,19 +1056,74 @@ class SpectralGUI:
             power = sum(np.multiply(np.power(powSpec, 2), self.samplerate/(self.enbw1 * self.dataSize)))
             if self.window1.get() == "Disabled":
                 if self.window2.get() == "Disabled":
-                    self.legend = self.ax2.legend([self.dots],
-                                                    ["Total power in selected band: %.6fV$^2$" %power],
-                                                    loc='upper right', title="Averaged spectra: %d" %self.averaged)
+                    if self.powerState.get() == "Disabled":
+                        # List of all plots for the legend
+                        self.plots = []
+                        # List of all plot titles
+                        self.plotTitles = []
+                    else:
+                        # List of all plots for the legend
+                        self.plots = [self.dots]
+                        # List of all plot titles
+                        self.plotTitles = ["Total power in selected band: %.6fV$^2$" %power]
+                    #self.legend = self.ax3.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: %d" %self.averaged)
+                    self.legend = self.ax2.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: %d" %self.averaged)
                 else:
-                    self.legend = self.ax2.legend([self.spectrum2, self.dots],
-                                                    [self.window2.get() + " window, ENBW: %.3fHz" %self.enbw1,
-                                                    "Total power in selected band: %.6fV$^2$" %power],
-                                                    loc='upper right', title="Averaged spectra: %d" %self.averaged)
+                    # Calculate and display main peak
+                    S2 = self.spectrum2.get_ydata()
+                    peakIndex = np.argmax(S2)
+                    peakF = self.f2[peakIndex]
+                    peak = S2[peakIndex]
+                    self.maxAnnotation2.remove()
+                    self.maxAnnotation2 = self.ax2.annotate('Peak\nf: %0.2f\ny: %0.2f' %(peakF, peak), 
+                        xy=(peakF, peak), xytext=(10, 15),
+                        textcoords='offset points',
+                        bbox=dict(alpha=0.5, fc="r"),
+                        arrowprops=dict(arrowstyle='->')
+                    )
+                    if self.powerState.get() == "Disabled":
+                        # List of all plots for the legend
+                        self.plots = [self.spectrum2]#, self.phase2]
+                        # List of all plot titles
+                        self.plotTitles = [self.window2.get() + " window, ENBW: %.3fHz" %self.enbw2]#,
+                                            #self.window2.get() + " window phase"]
+                    else:
+                        # List of all plots for the legend
+                        self.plots = [self.spectrum2, self.dots]#, self.phase2]
+                        # List of all plot titles
+                        self.plotTitles = [self.window2.get() + " window, ENBW: %.3fHz" %self.enbw2,
+                                            "Total power in selected band: %.6fV$^2$" %power]#,
+                                            #self.window2.get() + " window phase"]
+                    #self.legend = self.ax3.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: %d" %self.averaged)
+                    self.legend = self.ax2.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: %d" %self.averaged)
             elif self.window2.get() == "Disabled":
-                self.legend = self.ax2.legend([self.spectrum1, self.dots],
-                                                [self.window1.get() + " window, ENBW: %.3fHz" %self.enbw1,
-                                                "Total power in selected band: %.6fV$^2$" %power],
-                                                loc='upper right', title="Averaged spectra: %d" %self.averaged)
+                # Calculate and display main peak
+                S1 = self.spectrum1.get_ydata()
+                peakIndex = np.argmax(S1)
+                peakF = self.f1[peakIndex]
+                peak = S1[peakIndex]
+                self.maxAnnotation1.remove()
+                self.maxAnnotation1 = self.ax2.annotate('Peak\nf: %0.2f\ny: %0.2f' %(peakF, peak), 
+                    xy=(peakF, peak), xytext=(-50, 15),
+                    textcoords='offset points',
+                    bbox=dict(alpha=0.5, fc="b"),
+                    arrowprops=dict(arrowstyle='->')
+                )
+                if self.powerState.get() == "Disabled":
+                    # List of all plots for the legend
+                    self.plots = [self.spectrum1]#, self.phase1]
+                    # List of all plot titles
+                    self.plotTitles = [self.window1.get() + " window, ENBW: %.3fHz" %self.enbw1]#,
+                                        #self.window1.get() + " window phase"]
+                else:
+                    # List of all plots for the legend
+                    self.plots = [self.spectrum1, self.dots]#, self.phase1]
+                    # List of all plot titles
+                    self.plotTitles = [self.window1.get() + " window, ENBW: %.3fHz" %self.enbw1,
+                                        "Total power in selected band: %.6fV$^2$" %power]#,
+                                        #self.window1.get() + " window phase"]
+                #self.legend = self.ax3.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: %d" %self.averaged)
+                self.legend = self.ax2.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: %d" %self.averaged)
             else:
                 # Calculate and display main peak
                 S1 = self.spectrum1.get_ydata()
@@ -1051,11 +1148,25 @@ class SpectralGUI:
                     bbox=dict(alpha=0.5, fc="r"),
                     arrowprops=dict(arrowstyle='->')
                 )
-                self.legend = self.ax2.legend([self.spectrum1, self.spectrum2, self.dots],
-                                                [self.window1.get() + " window, ENBW: %.3fHz" %self.enbw1, 
-                                                self.window2.get() + " window, ENBW: %.3fHz" %self.enbw2,
-                                                "Total power in selected band: %.6fV$^2$" %power],
-                                                loc='upper right', title="Averaged spectra: %d" %self.averaged)
+                if self.powerState.get() == "Disabled":
+                    # List of all plots for the legend
+                    self.plots = [self.spectrum1, self.spectrum2]#, self.phase1, self.phase2]
+                    # List of all plot titles
+                    self.plotTitles = [self.window1.get() + " window, ENBW: %.3fHz" %self.enbw1,
+                                            self.window2.get() + " window, ENBW: %.3fHz" %self.enbw2]#,
+                                            #self.window1.get() + " window phase",
+                                            #self.window2.get() + " window phase"]
+                else:
+                        # List of all plots for the legend
+                    self.plots = [self.spectrum1, self.spectrum2, self.dots]#, self.phase1, self.phase2]
+                    # List of all plot titles
+                    self.plotTitles = [self.window1.get() + " window, ENBW: %.3fHz" %self.enbw1,
+                                            self.window2.get() + " window, ENBW: %.3fHz" %self.enbw2,
+                                            "Total power in selected band: %.6fV$^2$" %power]#,
+                                            #self.window1.get() + " window phase",
+                                            #self.window2.get() + " window phase"]
+                #self.legend = self.ax3.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: %d" %self.averaged)
+                self.legend = self.ax2.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: %d" %self.averaged)
             #L.pln(time.time()-lastTime)
         self.window.update_idletasks()
         # Reschedule function (this is probably not the best solution)
@@ -1078,6 +1189,18 @@ class SpectralGUI:
     # Callback for the stop button
     def stop(self, event):
         self.window.destroy()
+    
+    # Callback function for changing the power integrator state to "Disabled"
+    def handle_disablePower(self, event):
+        self.startFEntry["state"] = DISABLED
+        self.endFEntry["state"] = DISABLED
+        self.dots.set_visible(False)
+
+    # Callback function for changing the power integrator state to "Enabled"
+    def handle_enablePower(self, event):
+        self.startFEntry["state"] = NORMAL
+        self.endFEntry["state"] = NORMAL
+        self.dots.set_visible(True)
     
     # Event handler for start frequency entry box
     def handle_updateStartF(self, event=0):
