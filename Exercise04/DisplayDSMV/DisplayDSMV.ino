@@ -7,13 +7,14 @@
  *  
  *  @author Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
  *  @author Philipp Rahe (prahe@uos.de)
- *  @date 06.05.2022
- *  @version 1.4
+ *  @date 12.05.2022
+ *  @version 1.5
  *  
  *  @par Changelog 
+ *  - 12.05.2022: Added processing rate customization to USB protocol
  *  - 06.05.2022: Changed averaging to integer arithmetic,
  *                added functionality to send raw values to the PC (controlled via USB command),
- *                corrected documentation on USB-protocol
+ *                corrected documentation on USB protocol
  *  - 26.01.2022: Decreased interval between processing received commands
  *  - 17.01.2022: reduced speed of sending data via USB to ensure that the new GUI can keep up
  *  - 24.05.2021: updated for spectral analysis, output signals added
@@ -60,13 +61,11 @@ float gainLTC2500 = 1.0;        /**< Gain factor for the LTC2500 (this is your t
 float offsetInternal = 0;       /**< Offset voltage for the internal ADC (this is your task). */
 float gainInternal = 1.0;       /**< Gain factor Gain factor for the internal ADC (this is your task). */
 
-bool blinker = true;            /**< Specifies usage of LED_1. true: 1s interval (Note: This deactivates the analog output!). false: loop duration. */
+bool blinker = false;            /**< Specifies usage of LED_1. true: 1s interval (Note: This deactivates the analog output!). false: loop duration. */
 
 bool AD4020active = true;       /**< Specifies whether the AD4020 is being read. */
 bool LTC2500active = true;      /**< Specifies whether the AD4020 is being read. */
 bool INTERNALADCactive = true;  /**< Specifies whether the AD4020 is being read. */
-
-
 
 #define RES_AD4020  0.0000190734863 /**< Resolution of the AD4020. */
 #define RES_LTC2500 0.0000011920929 /**< Resolution of the LTC2500. */
@@ -84,13 +83,14 @@ bool INTERNALADCactive = true;  /**< Specifies whether the AD4020 is being read.
 #define SCHMITT 4                   /**< Triggering on the schmitt trigger. */
 #define settingOversamples 0        /**< Setting for the number of oversamples: */
 #define settingSize 1               /**< Setting for the data size. */
-#define settingFreq 2               /**< Setting for the sampling frequency. */
-#define settingTriggerSource 3      /**< Setting for the trigger source. */
-#define settingThreshold 4          /**< Setting for the voltage threshold of the trigger. */
-#define settingFlank 5              /**< Setting for the trigger flank. */
-#define settingActivate 6           /**< Setting for activating an ADC. */
-#define settingDeactivate 7         /**< Setting for deactivating an ADC. */
-#define settingSignalType 8         /**< Setting for the signal type sent to the PC. */
+#define settingSpectralFreq 2       /**< Setting for the sampling frequency. */
+#define settingProcessingFreq 3     /**< Setting for the output frequency. */
+#define settingTriggerSource 4      /**< Setting for the trigger source. */
+#define settingThreshold 5          /**< Setting for the voltage threshold of the trigger. */
+#define settingFlank 6              /**< Setting for the trigger flank. */
+#define settingActivate 7           /**< Setting for activating an ADC. */
+#define settingDeactivate 8         /**< Setting for deactivating an ADC. */
+#define settingSignalType 9         /**< Setting for the signal type sent to the PC. */
 #define signalVoltage 0             /**< Voltage read from ADCs. */
 #define signalRaw 1                 /**< Raw value read from ADCs. */
 #define INVALID -1                  /**< Invalid command. */
@@ -104,7 +104,7 @@ int32_t bufPos = 0;               /**< Position in the data buffers to write to.
 bool full = false;                /**< Specifies whether or not the buffer is ready to be sent to the PC. */
 bool sampleStart = true;          /**< Specifies whether or not the sampling for the next data set has just begun. */
 float samplerate = 1000;          /**< Sampling frequency. */
-float outputRate = 1000;          /**< Frequency to output the individual signal values. */
+float processingRate = 1000;      /**< Frequency to output the individual signal values. */
 float outputSigFreq = 89;         /**< Frequency of the output signal. */
 int oversamples = 1;              /**< Number of oversamples. */
 int signalType = signalVoltage;   /**< Signal type sent to the PC. */
@@ -137,19 +137,19 @@ void setup() {
 
   /******************************
    * Define interrupt routines for sampling of in- and outputs or for blinking LED */
-  T4setInterrupt1(readADCs);              // Set the ISR (interrupt service routine) for ADC readout
-  T4interSetup(GPT1, 1 / samplerate);     // Set the interval for the read interrupt
+  T4setInterrupt1(readADCs);                // Set the ISR (interrupt service routine) for ADC readout
+  T4interSetup(GPT1, 1 / samplerate);       // Set the interval for the read interrupt
   if(!blinker) {
-    T4setInterrupt2(writeDACs);         // Set the ISR for DAC output
-    T4interSetup(GPT2, 1 / outputRate);   // Set the interval for the output interrupt
+    T4setInterrupt2(writeDACs);             // Set the ISR for DAC output
+    T4interSetup(GPT2, 1 / processingRate); // Set the interval for the output interrupt
   } else {
-    T4setInterrupt2(blinking);            // Set the ISR for blinking LED
-    T4interSetup(GPT2, 0.5);              // Set the interval for the blinking LED
+    T4setInterrupt2(blinking);              // Set the ISR for blinking LED
+    T4interSetup(GPT2, 0.5);                // Set the interval for the blinking LED
   }
 
   /******************************
    * Add signals to the output or set PWM output */
-//  T4addSignal(outputSigFreq, 1, 0);
+  T4addSignal(outputSigFreq, 1, 0);
 //  T4addSignal(outputSigFreq+5.0, 1, 0);
   T4awV(DAC_TEENSY, 1.0);
 //  AD5791setVoltage(1.0);
@@ -176,8 +176,10 @@ void loop() {
 /** @brief Interrupt routine for writing values to the DACs
  */
 void writeDACs() {
-//  AD5791setVoltage(T4sigValue());
-//  T4awV(DAC_TEENSY, T4sigValue() + 1.0);
+  T4dw(LED_1, HIGH);
+  AD5791setVoltage(T4sigValue());
+  T4awV(DAC_TEENSY, T4sigValue() + 1.0);
+  T4dw(LED_1, LOW);
 }
 
 
@@ -348,11 +350,14 @@ bool checkUpdateSettings(String command) {
                                 bufLen = min(4*command.toInt(), maxLen);
                                 return true;
                                 break;
-    case settingFreq:           command.remove(0, 15);
+    case settingSpectralFreq:   command.remove(0, 15);
                                 samplerate = max(1, command.toFloat());
-                                //noInterrupts();
                                 T4interSetup(GPT1, 1 / samplerate);
-                                //interrupts();
+                                return true;
+                                break;
+    case settingProcessingFreq: command.remove(0, 20);
+                                processingRate = max(1, command.toFloat());
+                                T4interSetup(GPT2, 1 / processingRate);
                                 return true;
                                 break;
     case settingTriggerSource:  command.remove(0, 18);
@@ -448,7 +453,8 @@ bool checkUpdateSettings(String command) {
  *
  *  set oversamples       ->  settingOversamples
  *  set dataSize          ->  settingSize
- *  set samplerate        ->  settingFreq
+ *  set samplerate        ->  settingSpectralFreq
+ *  set processing rate   ->  settingProcessingFreq
  *  set triggerSource     ->  settingTriggerSource
  *  set threshold         ->  settingThreshold
  *  set flank             ->  settingFlank
@@ -462,7 +468,8 @@ bool checkUpdateSettings(String command) {
 int checkSetting(String command) {
   if(command.startsWith("set oversamples "))    {return settingOversamples;}
   if(command.startsWith("set dataSize "))       {return settingSize;}
-  if(command.startsWith("set samplerate "))     {return settingFreq;}
+  if(command.startsWith("set samplerate "))     {return settingSpectralFreq;}
+  if(command.startsWith("set processing rate ")){return settingProcessingFreq;}
   if(command.startsWith("set triggerSource "))  {return settingTriggerSource;}
   if(command.startsWith("set threshold "))      {return settingThreshold;}
   if(command.startsWith("set flank "))          {return settingFlank;}
