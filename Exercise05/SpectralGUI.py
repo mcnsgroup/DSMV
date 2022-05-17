@@ -17,9 +17,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 16.05.2022, ver1.7
+# 17.05.2022, ver1.7.1
 # 
 # Changelog
+#   - 17.05.2022: Changed appearance of the peak annotation for the spectra
 #   - 16.05.2022: Fixed a bug that caused the wrong data to be saved,
 #                 fixed a bug that caused the data tips for the spectra to break 
 #                 after disabling the respective spectrum,
@@ -125,7 +126,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05\nv1.6")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05\nv1.7.1")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -481,14 +482,14 @@ class SpectralGUI:
         #self.phase1, = self.ax3.plot(self.f1, [0] * (self.freqs1), "b.", label=self.windows[0] + " window phase")
         #self.phase2, = self.ax3.plot(self.f2, [0] * (self.freqs2), "r.", label=self.windows[0] + " window phase")
         # Create data tips for the spectra's respective maximum
-        self.maxAnnotation1 = self.ax2.annotate('x: %0.2f\ny: %0.2f' %(0, 0), 
+        self.maxAnnotation1 = self.ax2.annotate('x: %0.2f\ny: %0.5f' %(0, 0), 
 		    xy=(0, 0), xytext=(-50, 15),
 		    textcoords='offset points',
 		    bbox=dict(alpha=0.5, fc="b"),
 		    arrowprops=dict(arrowstyle='->')
 		)
         self.maxAnnotation1.set_visible(False)
-        self.maxAnnotation2 = self.ax2.annotate('x: %0.2f\ny: %0.2f' %(0, 0), 
+        self.maxAnnotation2 = self.ax2.annotate('x: %0.2f\ny: %0.5f' %(0, 0), 
 		    xy=(0, 0), xytext=(10, 15),
 		    textcoords='offset points',
 		    bbox=dict(alpha=0.5, fc="b"),
@@ -1075,7 +1076,7 @@ class SpectralGUI:
                     peakF = self.f2[peakIndex]
                     peak = S2[peakIndex]
                     self.maxAnnotation2.remove()
-                    self.maxAnnotation2 = self.ax2.annotate('Peak\nf: %0.2f\ny: %0.2f' %(peakF, peak), 
+                    self.maxAnnotation2 = self.ax2.annotate('Peak\nf: %0.2f\ny: %0.5f' %(peakF, peak), 
                         xy=(peakF, peak), xytext=(10, 15),
                         textcoords='offset points',
                         bbox=dict(alpha=0.5, fc="r"),
@@ -1103,7 +1104,7 @@ class SpectralGUI:
                 peakF = self.f1[peakIndex]
                 peak = S1[peakIndex]
                 self.maxAnnotation1.remove()
-                self.maxAnnotation1 = self.ax2.annotate('Peak\nf: %0.2f\ny: %0.2f' %(peakF, peak), 
+                self.maxAnnotation1 = self.ax2.annotate('Peak\nf: %0.2f\ny: %0.5f' %(peakF, peak), 
                     xy=(peakF, peak), xytext=(-50, 15),
                     textcoords='offset points',
                     bbox=dict(alpha=0.5, fc="b"),
@@ -1131,7 +1132,7 @@ class SpectralGUI:
                 peakF = self.f1[peakIndex]
                 peak = S1[peakIndex]
                 self.maxAnnotation1.remove()
-                self.maxAnnotation1 = self.ax2.annotate('Peak\nf: %0.2f\ny: %0.2f' %(peakF, peak), 
+                self.maxAnnotation1 = self.ax2.annotate('Peak\nf: %0.2f\ny: %0.5f' %(peakF, peak), 
                     xy=(peakF, peak), xytext=(-50, 15),
                     textcoords='offset points',
                     bbox=dict(alpha=0.5, fc="b"),
@@ -1142,7 +1143,7 @@ class SpectralGUI:
                 peakF = self.f2[peakIndex]
                 peak = S2[peakIndex]
                 self.maxAnnotation2.remove()
-                self.maxAnnotation2 = self.ax2.annotate('Peak\nf: %0.2f\ny: %0.2f' %(peakF, peak), 
+                self.maxAnnotation2 = self.ax2.annotate('Peak\nf: %0.2f\ny: %0.5f' %(peakF, peak), 
                     xy=(peakF, peak), xytext=(10, 15),
                     textcoords='offset points',
                     bbox=dict(alpha=0.5, fc="r"),
