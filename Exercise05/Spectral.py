@@ -5,9 +5,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 16.05.2022, ver1.7
+# 17.05.2022, ver1.7.1
 # 
 # Changelog
+#   - 17.05.2022: Changed appearance of the peak annotation for the spectra
 #   - 16.05.2022: Fixed a bug that caused the wrong data to be saved,
 #                 fixed a bug that caused the data tips for the spectra to break 
 #                 after disabling the respective spectrum,
