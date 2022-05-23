@@ -5,9 +5,12 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 10.05.2022, ver1.9
+# 23.05.2022, ver1.10
 # 
 # Changelog
+#   - 23.05.2022: Update to maintain compatibility with newer version of Arduino program,
+#                 fixed a bug that caused the serial connection to not be monitored at the beginning,
+#                 fixed a bug that falsely caused the reading to start after a serial reconnect
 #   - 10.05.2022: Added functionality to display the values of a point clicked on the plots
 #   - 09.05.2022: Added functionality to update entry boxes on keypad return key and focus out,
 #                 fixied a bug causing the parameters to not update properly when in histogram mode
