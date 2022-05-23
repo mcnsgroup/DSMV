@@ -1,6 +1,6 @@
 # SpectralGUI includes a GUI for the spectral analysis of the oscilloscope functionality of the DSMV board
 #
-# Requires the Arduino sketch DisplayDSMV.ino loaded on the Teensy 4.0.
+# Requires the Arduino sketch DisplayDSMVGenerate.ino loaded on the Teensy 4.0.
 # 
 # There are two spectra being displayed,
 # one for each of the selectable filter windows.
@@ -17,9 +17,15 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 19.05.2022, ver1.8
+# 23.05.2022, ver1.10
 # 
 # Changelog
+#   - 23.05.2022: Fixed a bug that caused the serial buffer to overflow,
+#                 added functionality to disable phases on initilizing the GUI,
+#                 phase apperance change,
+#                 fixed a bug that caused the serial connection to not be monitored at the beginning,
+#                 fixed a bug that falsely caused the reading to start after a serial reconnect
+#   - 20.05.2022: Changed data reading from board to polling
 #   - 19.05.2022: Added functionality to display phases of the spectra
 #   - 17.05.2022: Changed appearance of the peak annotation for the spectra,
 #                 simplified code for legend assembly,
@@ -83,6 +89,7 @@ import numpy as np
 from matplotlib.pyplot import *
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.animation as animation
 from tkinter import *
 from tkinter import ttk
 from PIL import Image, ImageTk
@@ -96,7 +103,7 @@ from DSMVLib import DSMVLib as L
 
 class SpectralGUI:
     # Constructor method
-    def __init__(self):
+    def __init__(self, drawPhase=False):
         # Initialize all components
         # Create control window
         self.window = Tk()
@@ -114,6 +121,7 @@ class SpectralGUI:
         except L.SerialDisconnect:
             quit()
         self.disconnected = False
+        self.readNext = False
         self.samplerateDefault = 1000.0
         self.samplerate = self.samplerateDefault
         self.dataSizeDefault = 100
@@ -125,6 +133,8 @@ class SpectralGUI:
         self.transformSize2 = math.floor(self.dataSizeDefault / 2)
         self.proc = self.procDefault
         self.port.clearBuffer()
+        self.readNext = True
+        self.drawPhase = drawPhase
         # Initialize data buffer
         self.data = [0] * self.dataSize
         # List with all UI elements
@@ -132,7 +142,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05\nv1.8")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05\nv1.10")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -443,7 +453,7 @@ class SpectralGUI:
         self.ax1.set_ylabel("Voltage AD4020 (V)")
         # Set time axis limits to match data
         self.ax1.set_xlim([0, tMax])
-        self.voltage, = self.ax1.plot(self.x, self.data, 'b.-', linewidth=0.5)#, animated=True)
+        self.voltage, = self.ax1.plot(self.x, self.data, 'b.-', linewidth=0.5)
         canvas1 = FigureCanvasTkAgg(self.fig1)
         canvas1.draw()
         self.uiElements.append(canvas1.get_tk_widget())
@@ -504,15 +514,6 @@ class SpectralGUI:
         # Create spectra
         self.spectrum1, = self.ax2.plot(self.f1, self.S1Pre, 'b.-', label=self.windows[0] + " window, ENBW: 0Hz", linewidth=0.5)
         self.spectrum2, = self.ax2.plot(self.f2, self.S2Pre, 'r.-', label=self.windows[0] + " window, ENBW: 0Hz", linewidth=0.5)
-        # Create arrays to hold current phases (pre averaging)
-        self.phase1Pre = [0] * self.freqs1
-        self.phase2Pre = [0] * self.freqs2
-        # Create axis for phase
-        self.ax3 = self.ax2.twinx()
-        self.ax3.set_ylabel('Phase')
-        # Create phases
-        self.phase1, = self.ax3.plot(self.f1, [0] * (self.freqs1), "b.", label=self.windows[0] + " window phase")
-        self.phase2, = self.ax3.plot(self.f2, [0] * (self.freqs2), "r.", label=self.windows[0] + " window phase")
         # Create data tips for the spectra's respective maximum
         self.maxAnnotation1 = self.ax2.annotate("Peak\nf: " + L.fstr(0, 5) + "\ny: " + L.fstr(0, 5), 
 		    xy=(0, 0), xytext=(-50, 15),
@@ -528,6 +529,17 @@ class SpectralGUI:
 		    arrowprops=dict(arrowstyle='->')
 		)
         self.maxAnnotation2.set_visible(False)
+        # Potentially create phases
+        if self.drawPhase:
+            # Create arrays to hold current phases (pre averaging)
+            self.phase1Pre = [0] * self.freqs1
+            self.phase2Pre = [0] * self.freqs2
+            # Create axis for phase
+            self.ax3 = self.ax2.twinx()
+            self.ax3.set_ylabel('Phase')
+            # Create phases
+            self.phase1, = self.ax3.plot(self.f1, [0] * (self.freqs1), "b.", label=self.windows[0] + " window phase", markersize=1)
+            self.phase2, = self.ax3.plot(self.f2, [0] * (self.freqs2), "r.", label=self.windows[0] + " window phase", markersize=1)
         # Start and end frequencies for the signal power integrator
         self.startF = 0
         self.endF = fMax
@@ -539,18 +551,27 @@ class SpectralGUI:
         # Default sacling is logarithmic
         self.ax2.set_yscale("log")
         # Legend for spectral display
-        #self.legend = self.ax2.legend(loc='upper right', title="Averaged spectra: 1")
-        # List of all plots for the legend
-        self.plots = [self.spectrum1, self.spectrum2, self.dots, self.phase1, self.phase2]
-        # List of all plot titles
-        self.plotTitles = [self.windows[0] + " window, ENBW: 0Hz",
-                            self.windows[0] + " window, ENBW: 0Hz",
-                            "Total power in selected band: 0V$^2$",
-                            self.windows[0] + " window phase",
-                            self.windows[0] + " window phase"]
-        # Legend for frequency-phase diagram
-        self.legend = self.ax3.legend(self.plots, self.plotTitles, loc="upper right", title="Averaged spectra: 1")
-        #self.legend = self.ax2.legend(self.plots, self.plotTitles, loc="upper right", title="Averaged spectra: 1")
+        # Check for phase setting
+        if self.drawPhase:
+            # List of all plots for the legend
+            self.plots = [self.spectrum1, self.spectrum2, self.dots, self.phase1, self.phase2]
+            # List of all plot titles
+            self.plotTitles = [self.windows[0] + " window, ENBW: 0Hz",
+                                self.windows[0] + " window, ENBW: 0Hz",
+                                "Total power in selected band: 0V$^2$",
+                                self.windows[0] + " window phase",
+                                self.windows[0] + " window phase"]
+            # Legend for frequency-phase diagram
+            self.legend = self.ax3.legend(self.plots, self.plotTitles, loc="upper right", title="Averaged spectra: 1")
+        else:
+            # List of all plots for the legend
+            self.plots = [self.spectrum1, self.spectrum2, self.dots]
+            # List of all plot titles
+            self.plotTitles = [self.windows[0] + " window, ENBW: 0Hz",
+                                self.windows[0] + " window, ENBW: 0Hz",
+                                "Total power in selected band: 0V$^2$"]
+            # Legend for frequency diagram
+            self.legend = self.ax2.legend(self.plots, self.plotTitles, loc="upper right", title="Averaged spectra: 1")
         # Draw the canvas
         canvas2 = FigureCanvasTkAgg(self.fig2)
         canvas2.draw()
@@ -653,19 +674,10 @@ class SpectralGUI:
         L.buildUI(self.uiElements, self.uiGridParams)
         # Maximize the window
         self.window.attributes("-zoomed", True)
-        
-        # Create background handlers for plots
-        #self.bg = self.fig1.canvas.copy_from_bbox(self.fig1.bbox)
-        # Function to draw initial plots
-        def drawInitialPlots():
-            self.bg = self.fig1.canvas.copy_from_bbox(self.fig1.bbox)
-            self.fig1.canvas.restore_region(self.bg)
-            self.ax1.draw_artist(self.voltage)
-            self.fig1.canvas.blit(self.fig1.bbox)
-        #self.window.after(1000, drawInitialPlots)
-        
         # Start the reading thread
-        self.port.start(maxSize=self.dataSizeMax*4)
+        self.port.start(maxSize=self.dataSizeMax*4*100)
+        # Start the serial connection monitor
+        self.window.after(0, self.checkConnection)
         # Execute the function to read with the mainloop of the window (this is probably not the best solution)
         self.window.mainloop()
 
@@ -708,6 +720,7 @@ class SpectralGUI:
         time.sleep(0.1)
         self.port.writeL('activate ' + str(self.sourceSelect.get()))
         self.port.clearBuffer()
+        self.readNext = True
         self.resetYSpectra()
 
     # Event handler for samplerate entry box
@@ -735,6 +748,7 @@ class SpectralGUI:
                 self.updateAxes()
                 # Clear serial buffer
                 self.port.clearBuffer()
+                self.readNext = True
         except ValueError:
             pass
         self.samplerateV.set(str(self.samplerate))
@@ -781,6 +795,7 @@ class SpectralGUI:
                 self.updateAxes()
                 # Clear serial buffer
                 self.port.clearBuffer()
+                self.readNext = True
         self.dataSizeV.set(str(self.dataSize))
         self.window.update_idletasks()
         # Reactivate reading if paused by this function
@@ -813,6 +828,7 @@ class SpectralGUI:
                 self.updateAxes()
                 # Clear serial buffer
                 self.port.clearBuffer()
+                self.readNext = True
         self.oversamplesV.set(str(self.oversamples))
         self.window.update_idletasks()
         # Reactivate reading if paused by this function
@@ -845,6 +861,7 @@ class SpectralGUI:
                 self.updateAxes()
                 # Clear serial buffer
                 self.port.clearBuffer()
+                self.readNext = True
         except ValueError:
             pass
         self.procV.set(str(self.proc))#
@@ -856,15 +873,16 @@ class SpectralGUI:
     
     # Reset the y-data and averaging of the spectra
     def resetYSpectra(self):
+        self.averaged = 0
         self.S1Pre = [0] * self.freqs1
         self.S2Pre = [0] * self.freqs2
-        self.phase1Pre = [0] * self.freqs1
-        self.phase2Pre = [0] * self.freqs2
-        self.averaged = 0
         self.spectrum1.set_ydata(self.S1Pre)
         self.spectrum2.set_ydata(self.S2Pre)
-        self.phase1.set_ydata(self.phase1Pre)
-        self.phase2.set_ydata(self.phase2Pre)
+        if self.drawPhase:
+            self.phase1Pre = [0] * self.freqs1
+            self.phase2Pre = [0] * self.freqs2
+            self.phase1.set_ydata(self.phase1Pre)
+            self.phase2.set_ydata(self.phase2Pre)
     
     # Updates the x axes for plots
     def updateAxes(self):
@@ -885,20 +903,25 @@ class SpectralGUI:
         self.voltage.set_xdata(self.x)
         self.spectrum1.set_xdata(self.f1)
         self.spectrum2.set_xdata(self.f2)
-        self.phase1.set_xdata(self.f1)
-        self.phase2.set_xdata(self.f2)
+        if self.drawPhase:
+            self.phase1.set_xdata(self.f1)
+            self.phase2.set_xdata(self.f2)
         self.voltage.set_ydata(self.data)
         self.resetYSpectra()
+        # Update power integrator indices
+        self.handle_updateStartF()
+        self.handle_updateEndF()
         # Set time axes scale
         self.ax1.set_xlim([0, tMax])
         # Set frequency axis limits to match data
         self.ax2.set_xlim([0, fMax])
-        self.ax3.set_xlim([0, fMax])
+        if self.drawPhase:
+            self.ax3.set_xlim([0, fMax])
         # Update the canvases
         L.updateCanvas(self.fig1.canvas, self.ax1, False, True)
         L.updateCanvas(self.fig2.canvas, self.ax2, False, True)
-        L.updateCanvas(self.fig2.canvas, self.ax3, False, True)
-        self.bg = self.fig1.canvas.copy_from_bbox(self.fig1.bbox)
+        if self.drawPhase:
+            L.updateCanvas(self.fig2.canvas, self.ax3, False, True)
     
     # Callback function for changing the y-scale to "Logarithmic"
     def handle_logScale(self, event):
@@ -916,11 +939,13 @@ class SpectralGUI:
     def handle_updateWindow1(self, event=0):
         if self.window1.get() == "Disabled":
             self.spectrum1.set_visible(False)
-            self.phase1.set_visible(False)
+            if self.drawPhase:
+                self.phase1.set_visible(False)
             self.maxAnnotation1.set_visible(False)
         else:
             self.spectrum1.set_visible(True)
-            self.phase1.set_visible(True)
+            if self.drawPhase:
+                self.phase1.set_visible(True)
             self.maxAnnotation1.set_visible(True)
             self.winFunc1 = "Window" + self.window1.get() + "." + "Window" + self.window1.get()
             self.resetYSpectra()
@@ -929,11 +954,13 @@ class SpectralGUI:
     def handle_updateWindow2(self, event=0):
         if self.window2.get() == "Disabled":
             self.spectrum2.set_visible(False)
-            self.phase2.set_visible(False)
+            if self.drawPhase:
+                self.phase2.set_visible(False)
             self.maxAnnotation2.set_visible(False)
         else:
             self.spectrum2.set_visible(True)
-            self.phase2.set_visible(True)
+            if self.drawPhase:
+                self.phase2.set_visible(True)
             self.maxAnnotation2.set_visible(True)
             self.winFunc2 = "Window" + self.window2.get() + "." + "Window" + self.window2.get()
             self.resetYSpectra()
@@ -966,6 +993,7 @@ class SpectralGUI:
         self.updateAxes()
         # Clear serial buffer
         self.port.clearBuffer()
+        self.readNext = True
     
     # Callback function for changing the subtraction to "Enabled"
     def handle_subEn(self, event):
@@ -974,6 +1002,7 @@ class SpectralGUI:
         self.updateAxes()
         # Clear serial buffer
         self.port.clearBuffer()
+        self.readNext = True
     
     # Event handler for transform size entry box
     def handle_updateTransformSize1(self, event=0):
@@ -996,6 +1025,7 @@ class SpectralGUI:
             self.updateAxes()
             # Clear serial buffer
             self.port.clearBuffer()
+            self.readNext = True
         self.transformSize1V.set(str(self.transformSize1))
         self.window.update_idletasks()
         # Reactivate reading if paused by this function
@@ -1024,6 +1054,7 @@ class SpectralGUI:
             self.updateAxes()
             # Clear serial buffer
             self.port.clearBuffer()
+            self.readNext = True
         self.transformSize2V.set(str(self.transformSize2))
         self.window.update_idletasks()
         # Reactivate reading if paused by this function
@@ -1044,8 +1075,8 @@ class SpectralGUI:
         self.transformSizeStatus.set("N_FT-1=N/2")
         self.handle_updateSize()
     
-    # Function that handles reading and displaying data from the serial port
-    def readDisp(self):
+    # Function to check and possibly restore serial connection
+    def checkConnection(self):
         # Prepare for restoring settings on reconnect
         if self.port.disconnected() and not self.disconnected:
             self.disconnected = True
@@ -1055,44 +1086,56 @@ class SpectralGUI:
             self.waitLabel.configure(text="Connection Lost")
             self.waitLabel.grid(row=0, column=0, columnspan=2, sticky="WE")
             self.window.update_idletasks()
-            self.window.after(0, self.readDisp)
         elif self.disconnected and self.port.disconnected():
             self.window.update_idletasks()
-            self.window.after(0, self.readDisp)
         # Restore settings on reconnect
         if self.disconnected and not self.port.disconnected():
             time.sleep(0.01)
             self.updateAll(False)
+            self.waitLabel.grid_forget()
             L.buildUI(self.uiElements, self.uiGridParams)
             self.window.update_idletasks()
             self.disconnected = False
-            self.reading = self.reactivate
-        # Do nothing if the button to start the program hasn't been pressed yet or the port is bein initialized
+            if self.reactivate:
+                self.handle_switchRead()
         if not self.reading:
+            self.window.after(1, self.checkConnection)
+    
+    # Function that handles reading and displaying data from the serial port
+    def readDisp(self):
+        self.execRead = True
+        self.checkConnection()
+        # Do nothing if the button to start the program hasn"t been pressed yet or the port is being initialized
+        if not self.reading:
+            self.execRead = False
             return
         # Read data from the serial port (if enough is available)
+        # Issue command to board to send data
+        if self.readNext:
+            self.port.writeL("send data")
+            self.readNext = False
         # Read raw values
         rawValues = self.port.readB(self.dataSize*4)
         # Only process data, if there was any read
         if rawValues != None and rawValues != "not enough data":
-            lastTime = time.time()
+            #lastTime = time.time()
             # Discard any extra data on the port
             self.port.clearBuffer()
+            # Prepare for next read
+            self.readNext = True
             values = list(struct.unpack("%df" %self.dataSize, rawValues))
             # Store the different parts to the different sub arrays of the data buffer
             self.data = values#[0:self.dataSize]
             # Possibly subtract average
             if self.subtract.get() == "Enabled":
                 self.data = np.subtract(self.data, np.average(self.data))
-            
-            
             # Debug test for values that are clearly out of range
             if max(np.abs(self.data)) > 100:
                 L.p("There was a misread: ")
                 L.pln(max(np.abs(self.data)))
-            
-            
-            
+                L.pln(values)
+                L.pln(rawValues)
+                self.handle_switchRead()
             # Multiply with window functions
             for f in self.windowFiles:
                 exec("import " + f[0:len(f)-3])
@@ -1108,21 +1151,21 @@ class SpectralGUI:
             #X2 = np.multiply(np.fft.fft(x2)[0:self.freqs1], 2/self.dataSize)
             X1 = np.multiply(np.fft.fft(x1, n=(self.transformSize1 - 1) * 2)[0:self.freqs1], 2/self.dataSize)
             X2 = np.multiply(np.fft.fft(x2, n=(self.transformSize2 - 1) * 2)[0:self.freqs2], 2/self.dataSize)
-            # Possibly average spectra and calculate phases
+            # Possibly average spectra and possibly calculate phases
             if self.averaging.get():
                 self.S1Pre += abs(X1)
                 self.S2Pre += abs(X2)
-                self.phase1Pre += np.angle(X1)
-                self.phase2Pre += np.angle(X2)
+                if self.drawPhase:
+                    self.phase1Pre += np.angle(X1)
+                    self.phase2Pre += np.angle(X2)
                 self.averaged += 1
             else:
                 self.S1Pre = abs(X1)
                 self.S2Pre = abs(X2)
-                self.phase1Pre = np.angle(X1)
-                self.phase2Pre = np.angle(X2)
+                if self.drawPhase:
+                    self.phase1Pre = np.angle(X1)
+                    self.phase2Pre = np.angle(X2)
                 self.averaged = 1
-            
-            
             # Display the values
             self.voltage.set_ydata(self.data)
             # Multiply based on the selected unit
@@ -1131,15 +1174,6 @@ class SpectralGUI:
             L.updateCanvas(self.fig1.canvas, self.ax1, False, True)
             #lastTime = time.time()
             #L.pln(time.time()-lastTime)
-            
-            
-            #self.fig1.canvas.restore_region(self.bg)
-            #self.ax1.draw_artist(self.voltage)
-            #self.fig1.canvas.blit(self.fig1.bbox)
-            #self.fig1.canvas.flush_events()
-            #self.port.clearBuffer()
-            #L.pln(time.time()-lastTime)
-            #L.pln()
             # Update the legends
             # extract range to integrate over and average
             powSpec = np.divide(self.S1Pre[self.startFindex:self.endFindex+1], self.averaged)
@@ -1161,12 +1195,14 @@ class SpectralGUI:
                     bbox=dict(alpha=0.5, fc="b"),
                     arrowprops=dict(arrowstyle='->')
                 )
-                # Update phase 1
-                self.phase1.set_ydata(np.divide(self.phase1Pre, self.averaged))
                 # Add first spectrum to the legend
-                self.plots += [self.spectrum1, self.phase1]
-                self.plotTitles += [self.window1.get() + " window, ENBW: %.3fHz" %self.enbw1,
-                                        self.window1.get() + " window phase"]
+                self.plots += [self.spectrum1]
+                self.plotTitles += [self.window1.get() + " window, ENBW: %.3fHz" %self.enbw1]
+                # Possibly update phase 1 and add it to the legend
+                if self.drawPhase:
+                    self.phase1.set_ydata(np.divide(self.phase1Pre, self.averaged))
+                    self.plots += [self.phase1]
+                    self.plotTitles += [self.window1.get() + " window phase"]
             if self.window2.get() != "Disabled":
                 # Calculate and display main peak
                 S2 = self.spectrum2.get_ydata()
@@ -1180,26 +1216,31 @@ class SpectralGUI:
                     bbox=dict(alpha=0.5, fc="r"),
                     arrowprops=dict(arrowstyle='->')
                 )
-                # Update phase 2
-                self.phase2.set_ydata(np.divide(self.phase2Pre, self.averaged))
                 # Add second spectrum to the legend
-                self.plots += [self.spectrum2, self.phase2]
-                self.plotTitles += [self.window2.get() + " window, ENBW: %.3fHz" %self.enbw2,
-                                    self.window2.get() + " window phase"]
+                self.plots += [self.spectrum2]
+                self.plotTitles += [self.window2.get() + " window, ENBW: %.3fHz" %self.enbw2]
+                # Possibly update phase 2 and add it to the legend
+                if self.drawPhase:
+                    self.phase2.set_ydata(np.divide(self.phase2Pre, self.averaged))
+                    self.plots += [self.phase2]
+                    self.plotTitles += [self.window2.get() + " window phase"]
             if self.powerState.get() != "Disabled":
                 # Add power integrator to the legend
                 self.plots += [self.dots]
                 self.plotTitles += ["Total power in selected band: %.6fV$^2$" %power]
-            self.legend = self.ax3.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: %d" %self.averaged)
-            #self.legend = self.ax2.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: %d" %self.averaged)
-            # Update the canvas for the phases
-            L.updateCanvas(self.fig2.canvas, self.ax3, False, True)
+            # Draw the legend
+            if self.drawPhase:
+                self.legend = self.ax3.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: %d" %self.averaged)
+                # Update the canvas for the phases
+                L.updateCanvas(self.fig2.canvas, self.ax3, False, True)
+            else:
+                self.legend = self.ax2.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: %d" %self.averaged)
         self.window.update_idletasks()
         # Reschedule function (this is probably not the best solution)
         self.window.after(0, self.readDisp)
 
     # Callback for read switch
-    def handle_switchRead(self, event):
+    def handle_switchRead(self, event=0):
         if self.reading:
             self.reading = False
             self.readSwitch['text'] = "Run                "
@@ -1211,6 +1252,7 @@ class SpectralGUI:
             self.readLabel['text'] = "Running"
             self.window.update_idletasks()
             self.reading = True
+            self.readNext = True
     
     # Callback for the stop button
     def stop(self, event):
