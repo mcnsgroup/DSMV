@@ -1,4 +1,4 @@
-/** @file DSMVDisplayGenerate.ino
+/** @file DisplayDSMVGenerate.ino
  *  @brief Implements the basic functionality of an oscilloscope.
  *
  *  Requires a Teensy 4.0 together with DSMV Board version 2.0
@@ -7,10 +7,12 @@
  *  
  *  @author Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
  *  @author Philipp Rahe (prahe@uos.de)
- *  @date 12.05.2022
- *  @version 1.5
+ *  @date 23.05.2022
+ *  @version 1.7
  *  
  *  @par Changelog 
+ *  - 23.05.2022: Changed sending of data to PC to only sending chunks of 4096 bytes at a time
+ *  - 20.05.2022: Added command for sending data to PC to USB protocol
  *  - 12.05.2022: Added processing rate customization to USB protocol
  *  - 06.05.2022: Changed averaging to integer arithmetic,
  *                added functionality to send raw values to the PC (controlled via USB command),
@@ -91,6 +93,7 @@ bool INTERNALADCactive = true;  /**< Specifies whether the AD4020 is being read.
 #define settingActivate 7           /**< Setting for activating an ADC. */
 #define settingDeactivate 8         /**< Setting for deactivating an ADC. */
 #define settingSignalType 9         /**< Setting for the signal type sent to the PC. */
+#define commandRequest 10           /**< Command for requesting data to be sent to the PC. */
 #define signalVoltage 0             /**< Voltage read from ADCs. */
 #define signalRaw 1                 /**< Raw value read from ADCs. */
 #define INVALID -1                  /**< Invalid command. */
@@ -102,9 +105,10 @@ uint8_t bufLTC2500[maxLen];       /**< Data buffer for the LTC2500. */
 uint8_t bufInternal[maxLen];      /**< Data buffer for the internal ADC. */
 int32_t bufPos = 0;               /**< Position in the data buffers to write to. */
 bool full = false;                /**< Specifies whether or not the buffer is ready to be sent to the PC. */
+bool request = false;             /**< Specifies whether or not the PC has requested data to be sent. */
 bool sampleStart = true;          /**< Specifies whether or not the sampling for the next data set has just begun. */
 float samplerate = 1000;          /**< Sampling frequency. */
-float processingRate = 40000;      /**< Frequency to output the individual signal values. */
+float processingRate = 1000;      /**< Frequency to output the individual signal values. */
 float outputSigFreq = 4000;         /**< Frequency of the output signal. */
 int oversamples = 1;              /**< Number of oversamples. */
 int signalType = signalVoltage;   /**< Signal type sent to the PC. */
@@ -150,13 +154,14 @@ void setup() {
   /******************************
    * Add signals to the output or set PWM output */
   T4addSignal(outputSigFreq, 1, 0);
+//  T4addSignal(outputSigFreq+5.0, 1, 0);
   T4awV(DAC_TEENSY, 1.0);
 //  AD5791setVoltage(1.0);
 
 
   /******************************
    * Finalise setup */
-  T4addSerialFunc(checkUpdateSettings);   // Set the function to check the serial port for commands
+  T4addSerialFunc(checkUpdateUSB);   // Set the function to check the serial port for commands
   interrupts();                           // Setup complete, activate interrupts
 }
 
@@ -164,21 +169,19 @@ void setup() {
 /** @brief Main loop function
  */
 void loop() {
-  for(int i=0; i<200; i++) {
-    T4checkSerialBuffer();
-    delay(1);  // only send at a maximum rate of 5 Hz so the GUI can keep up with reading the data
-  }
+  T4checkSerialBuffer();
   sendDataToPC();
+  delay(1);
 }
 
 
 /** @brief Interrupt routine for writing values to the DACs
  */
 void writeDACs() {
-  //T4dw(LED_1, HIGH);
+  if(!blinker) {T4dw(LED_2, HIGH);}
   AD5791setVoltage(T4sigValue());
-  //T4awV(DAC_TEENSY, T4sigValue() + 1.0);
-  //T4dw(LED_1, LOW);
+  T4awV(DAC_TEENSY, T4sigValue() + 1.0);
+  if(!blinker) {T4dw(LED_2, LOW);}
 }
 
 
@@ -326,11 +329,55 @@ void readADCs() {
  */
 void sendDataToPC() {
   if(!full) {return;} // If the buffers aren't full yet, there is nothing to be sent.
-  if(AD4020active)      {T4sw(bufAD4020, bufLen);}
-  if(LTC2500active)     {T4sw(bufLTC2500, bufLen);}
-  if(INTERNALADCactive) {T4sw(bufInternal, bufLen);}
   bufPos = 0;
   sampleStart = true;
+  // If the PC hasn't requested any data, it is discarded.
+  if(!request) {
+    full = false;
+    return;
+  }
+  // Debug to see if there are any irregularities within the data
+  /*float maxVal = 0;
+  for(int j=0; j<bufLen/4; j++) {}
+    uint32_t rawVal = 0;
+    rawVal += bufAD4020[i*4] << 0;
+    rawVal += bufAD4020[i*4 + 1] << 8;
+    rawVal += bufAD4020[i*4 + 2] << 16;
+    rawVal += bufAD4020[i*4 + 3] << 24;
+    float val = reinterpret_cast<float &>(rawVal);
+    if(abs(val) > maxVal) {
+      maxVal = abs(val);
+    }
+  if(maxVal > 100) {
+    T4dw(LED_3, HIGH);
+  }*/
+  int chunkLen = 4096;
+  int lastI = bufLen/chunkLen;
+  if(AD4020active) {
+    for(int i=0; i < bufLen/chunkLen; i++) {
+      uint8_t *arr = &bufAD4020[i*chunkLen];
+      T4sw(arr, chunkLen);
+    }
+    uint8_t *arr = &bufAD4020[lastI*chunkLen];
+    T4sw(arr, bufLen - lastI*chunkLen);
+  }
+  if(LTC2500active) {
+    for(int i=0; i < bufLen/chunkLen; i++) {
+      uint8_t *arr = &bufLTC2500[i*chunkLen];
+      T4sw(arr, chunkLen);
+    }
+    uint8_t *arr = &bufLTC2500[lastI*chunkLen];
+    T4sw(arr, bufLen - lastI*chunkLen);
+  }
+  if(INTERNALADCactive) {
+    for(int i=0; i < bufLen/chunkLen; i++) {
+      uint8_t *arr = &bufInternal[i*chunkLen];
+      T4sw(arr, chunkLen);
+    }
+    uint8_t *arr = &bufInternal[lastI*chunkLen];
+    T4sw(arr, bufLen - lastI*chunkLen);
+  }
+  request = false;
   full = false;
 }
 
@@ -339,8 +386,8 @@ void sendDataToPC() {
  *  @param command Command (in ASCII format) as received from PC
  *  @return false if an invalid command has been received. Otherwise true. 
  */
-bool checkUpdateSettings(String command) {
-  switch(checkSetting(command)) {
+bool checkUpdateUSB(String command) {
+  switch(checkCommand(command)) {
     case settingOversamples:    command.remove(0, 16);
                                 oversamples = command.toInt();
                                 return true;
@@ -439,6 +486,9 @@ bool checkUpdateSettings(String command) {
                                                       break;
                                 }
                                 break;
+    case commandRequest:        request = true;
+                                return true;
+                                break;
     case INVALID:               return false;
                                 break;
   }
@@ -460,11 +510,12 @@ bool checkUpdateSettings(String command) {
  *  activate              ->  settingActivate
  *  deactivate            ->  settingDeactivate
  *  set signalType        ->  settingSignalType
+ *  send data             ->  commandRequest
  *
  *  @param command Command (in ASCII format) as received from PC
  *  @return numerical identifier for the respective command.
  */
-int checkSetting(String command) {
+int checkCommand(String command) {
   if(command.startsWith("set oversamples "))    {return settingOversamples;}
   if(command.startsWith("set dataSize "))       {return settingSize;}
   if(command.startsWith("set samplerate "))     {return settingSpectralFreq;}
@@ -475,6 +526,7 @@ int checkSetting(String command) {
   if(command.startsWith("activate "))           {return settingActivate;}
   if(command.startsWith("deactivate "))         {return settingDeactivate;}
   if(command.startsWith("set signalType "))     {return settingSignalType;}
+  if(command.startsWith("send data"))           {return commandRequest;}
   return INVALID;
 }
 
