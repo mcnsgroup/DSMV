@@ -1,13 +1,19 @@
 # Spectral starts a GUI for the spectral analysis of the oscilloscope functionality of the DSMV board
 #
-# Requires the Arduino sketch DisplayDSMV.ino loaded on the Teensy 4.0.
+# Requires the Arduino sketch DisplayDSMVGenerate.ino loaded on the Teensy 4.0.
 # See SpectralGUI.py for further information. 
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 19.05.2022, ver1.8
+# 23.05.2022, ver1.10
 # 
 # Changelog
+#   - 23.05.2022: Fixed a bug that caused the serial buffer to overflow,
+#                 added functionality to disable phases on initilizing the GUI,
+#                 phase apperance change,
+#                 fixed a bug that caused the serial connection to not be monitored at the beginning,
+#                 fixed a bug that falsely caused the reading to start after a serial reconnect
+#   - 20.05.2022: Changed data reading from board to polling
 #   - 19.05.2022: Added functionality to display phases of the spectra
 #   - 17.05.2022: Changed appearance of the peak annotation for the spectra
 #   - 16.05.2022: Fixed a bug that caused the wrong data to be saved,
