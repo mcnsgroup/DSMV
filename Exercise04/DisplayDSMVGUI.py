@@ -4,9 +4,12 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 10.05.2022, ver1.9
+# 23.05.2022, ver1.10
 # 
 # Changelog
+#   - 23.05.2022: Update to maintain compatibility with newer version of Arduino program,
+#                 fixed a bug that caused the serial connection to not be monitored at the beginning,
+#                 fixed a bug that falsely caused the reading to start after a serial reconnect
 #   - 10.05.2022: Added functionality to display the values of a point clicked on the plots
 #   - 09.05.2022: Added functionality to update entry boxes on keypad return key and focus out,
 #                 fixied a bug causing the parameters to not update properly when in histogram mode
@@ -86,6 +89,7 @@ class DisplayDSMVGUI:
         except L.SerialDisconnect:
             quit()
         self.disconnected = False
+        self.readNext = False
         self.oversamplesDefault = 1
         self.oversamples = self.oversamplesDefault
         self.samplerateDefault = 1000.0
@@ -100,7 +104,7 @@ class DisplayDSMVGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 04\nv1.9")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 04\nv1.10")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -140,7 +144,7 @@ class DisplayDSMVGUI:
         # Minimum samplerate
         self.samplerateMin = 1
         # Maximum samplerate
-        self.samplerateMax = 90000
+        self.samplerateMax = 80000
         # Create label for the data size entry box
         self.sizeLabel = Label(master=self.dataSFrame, text="N_s")
         self.uiElements.append(self.sizeLabel)
@@ -280,7 +284,7 @@ class DisplayDSMVGUI:
         # create frame for the run control
         self.runFrame = Frame(master=self.controlFrame, relief=RIDGE, borderwidth=2)
         self.uiElements.append(self.runFrame)
-        self.uiGridParams.append([0, 4, 1, 1, "NESW"])
+        self.uiGridParams.append([0, 2, 1, 1, "NESW"])
         self.runFrame.rowconfigure(1, weight=1)
         # Create Label for run control
         self.runLabel = Label(master=self.runFrame, text="Run control")
@@ -303,7 +307,7 @@ class DisplayDSMVGUI:
         # Status variable controlling the reading of data
         self.reading = False
         # Status variable for handling restarting the reading of data
-        self.reactivate = True
+        self.reactivate = False
         # Create stop button
         self.stopButton = Button(master=self.runSFrame, text="Quit Program", fg="black", bg="red")
         self.uiElements.append(self.stopButton)
@@ -425,7 +429,7 @@ class DisplayDSMVGUI:
         canvas3.draw()
         self.uiElements.append(canvas3.get_tk_widget())
         self.uiGridParams.append([3, 0, 1, 2, "NESW"])
-        # Create data tip for canvas 1
+        # Create data tip for canvas 3
         self.dataTip3 = L.dataTip(canvas3, self.ax3, self.line3, 0.01)
         # Create frame for saving the plot
         self.saveFrame3 = Frame()
@@ -467,6 +471,8 @@ class DisplayDSMVGUI:
         self.window.attributes("-zoomed", True)
         # Start the reading thread
         self.port.start(maxSize=self.dataSizeMax*3*4)
+        # Start the serial connection monitor
+        self.window.after(0, self.checkConnection)
         # Execute the function to read with the mainloop of the window (this is probably not the best solution)
         self.window.mainloop()
     
@@ -545,6 +551,7 @@ class DisplayDSMVGUI:
             self.updateTimeAxes()
             # Clear serial buffer
             self.port.clearBuffer()
+            self.readNext = True
         self.samplerateV.set(str(self.samplerate))
         self.timeLabel['text'] = "Time/series: %.4fs" %(self.dataSize * self.oversamples / self.samplerate)
         self.window.update_idletasks()
@@ -588,6 +595,7 @@ class DisplayDSMVGUI:
             self.updateTimeAxes()
             # Clear serial buffer
             self.port.clearBuffer()
+            self.readNext = True
         self.dataSizeV.set(str(self.dataSize))
         self.timeLabel['text'] = "Time/series: %.4fs" %(self.dataSize * self.oversamples / self.samplerate)
         self.window.update_idletasks()
@@ -619,6 +627,7 @@ class DisplayDSMVGUI:
             self.updateTimeAxes()
             # Clear serial buffer
             self.port.clearBuffer()
+            self.readNext = True
         self.oversamplesV.set(str(self.oversamples))
         self.timeLabel['text'] = "Time/series: %.4fs" %(self.dataSize * self.oversamples / self.samplerate)
         self.window.update_idletasks()
@@ -750,6 +759,7 @@ class DisplayDSMVGUI:
         self.flank.set("Falling")
         self.port.writeL('set flank ' + str(self.flank.get()))
 
+    # Function to check and possibly restore serial connection
     def checkConnection(self):
         # Prepare for restoring settings on reconnect
         if self.port.disconnected() and not self.disconnected:
@@ -770,10 +780,8 @@ class DisplayDSMVGUI:
             L.buildUI(self.uiElements, self.uiGridParams)
             self.window.update_idletasks()
             self.disconnected = False
-            self.handle_switchRead(event=0)
             if self.reactivate:
-                pass
-                #self.handle_switchRead()
+                self.handle_switchRead()
         if not self.reading:
             self.window.after(1, self.checkConnection)
     
@@ -786,12 +794,18 @@ class DisplayDSMVGUI:
             self.execRead = False
             return
         # Read data from the serial port (if enough is available)
+        # Issue command to board to send data
+        if self.readNext:
+            self.port.writeL("send data")
+            self.readNext = False
         # Read raw values
         rawValues = self.port.readB(self.dataSize*3*4)
         # Only process data, if there was any read
         if rawValues != "not enough data":
             # Discard any extra data on the port
             self.port.clearBuffer()
+            # Prepare for next read
+            self.readNext = True
             values = list(struct.unpack("%df" %(self.dataSize*3), rawValues))
             # Store the different parts to the different sub arrays of the data buffer
             self.data[0] = values[0:self.dataSize]
@@ -837,7 +851,7 @@ class DisplayDSMVGUI:
         self.window.after(0, self.readDisp)
 
     # Callback for read switch
-    def handle_switchRead(self, event):
+    def handle_switchRead(self, event=0):
         if self.reading:
             self.reading = False
             self.readSwitch['text'] = "Run                "
@@ -849,6 +863,7 @@ class DisplayDSMVGUI:
             self.readLabel['text'] = "Running"
             self.window.update_idletasks()
             self.reading = True
+            self.readNext = True
     
     # Callback for the stop button
     def stop(self, event):
