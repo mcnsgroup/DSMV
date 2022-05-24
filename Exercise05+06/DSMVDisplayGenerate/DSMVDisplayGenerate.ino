@@ -8,11 +8,12 @@
  *  @author Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
  *  @author Philipp Rahe (prahe@uos.de)
  *  @date 24.05.2022
- *  @version 1.7.1
+ *  @version 1.7.2
  *  
  *  @par Changelog 
  *  - 24.05.2022: Reverted change of sending data in chunks
- *                as this wasn't necessary after a fix in the timing of sending data
+ *                as this wasn't necessary after a fix in the timing of sending data,
+ *                changed USB protocol to be compatible with future python GUIs
  *  - 23.05.2022: Changed sending of data to PC to only sending chunks of 4096 bytes at a time
  *  - 20.05.2022: Added command for sending data to PC to USB protocol
  *  - 12.05.2022: Added processing rate customization to USB protocol
@@ -92,7 +93,7 @@ bool INTERNALADCactive = true;  /**< Specifies whether the AD4020 is being read.
 #define settingTriggerSource 4      /**< Setting for the trigger source. */
 #define settingThreshold 5          /**< Setting for the voltage threshold of the trigger. */
 #define settingFlank 6              /**< Setting for the trigger flank. */
-#define settingActivate 7           /**< Setting for activating an ADC. */
+#define settingMode 7           /**< Setting for activating an ADC. */
 #define settingDeactivate 8         /**< Setting for deactivating an ADC. */
 #define settingSignalType 9         /**< Setting for the signal type sent to the PC. */
 #define commandRequest 10           /**< Command for requesting data to be sent to the PC. */
@@ -408,7 +409,7 @@ bool checkUpdateUSB(String command) {
                                                 break;
                                 }
                                 break;
-    case settingActivate:       command.remove(0, 9);
+    case settingMode:       command.remove(0, 9);
                                 switch(checkADC(command)) {
                                   case AD4020:      AD4020active = true;
                                                     return true;
@@ -471,7 +472,7 @@ bool checkUpdateUSB(String command) {
  *  set triggerSource     ->  settingTriggerSource
  *  set threshold         ->  settingThreshold
  *  set flank             ->  settingFlank
- *  activate              ->  settingActivate
+ *  activate              ->  settingMode
  *  deactivate            ->  settingDeactivate
  *  set signalType        ->  settingSignalType
  *  send data             ->  commandRequest
@@ -487,7 +488,7 @@ int checkCommand(String command) {
   if(command.startsWith("set triggerSource "))    {return settingTriggerSource;}
   if(command.startsWith("set threshold "))        {return settingThreshold;}
   if(command.startsWith("set flank "))            {return settingFlank;}
-  if(command.startsWith("activate "))             {return settingActivate;}
+  if(command.startsWith("set mode "))             {return settingMode;}
   if(command.startsWith("deactivate "))           {return settingDeactivate;}
   if(command.startsWith("set signalType "))       {return settingSignalType;}
   if(command.startsWith("send data"))             {return commandRequest;}
