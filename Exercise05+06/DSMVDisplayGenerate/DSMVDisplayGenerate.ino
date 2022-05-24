@@ -153,8 +153,8 @@ void setup() {
 
   /******************************
    * Add signals to the output or set PWM output */
-  T4addSignal(outputSigFreq, 1, 0);
-//  T4addSignal(outputSigFreq+5.0, 1, 0);
+  T4addSignal(1000.0, 1, 0);
+  T4addSignal(1005.0, 1, 0);
   T4awV(DAC_TEENSY, 1.0);
 //  AD5791setVoltage(1.0);
 
