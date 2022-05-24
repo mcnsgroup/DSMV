@@ -7,10 +7,12 @@
  *  
  *  @author Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
  *  @author Philipp Rahe (prahe@uos.de)
- *  @date 23.05.2022
- *  @version 1.7
+ *  @date 24.05.2022
+ *  @version 1.7.1
  *  
  *  @par Changelog 
+ *  - 24.05.2022: Reverted change of sending data in chunks
+ *                as this wasn't necessary after a fix in the timing of sending data
  *  - 23.05.2022: Changed sending of data to PC to only sending chunks of 4096 bytes at a time
  *  - 20.05.2022: Added command for sending data to PC to USB protocol
  *  - 12.05.2022: Added processing rate customization to USB protocol
@@ -109,13 +111,13 @@ bool request = false;             /**< Specifies whether or not the PC has reque
 bool sampleStart = true;          /**< Specifies whether or not the sampling for the next data set has just begun. */
 float samplerate = 1000;          /**< Sampling frequency. */
 float processingRate = 1000;      /**< Frequency to output the individual signal values. */
-float outputSigFreq = 4000;         /**< Frequency of the output signal. */
+float outputSigFreq = 4000;       /**< Frequency of the output signal. */
 int oversamples = 1;              /**< Number of oversamples. */
-int signalType = signalVoltage;   /**< Signal type sent to the PC. */
 int samples = 0;                  /**< Number of samples since last storing. */
-float voltageAD4020 = 0;          /**< Stores the current sum of the voltage values of the AD4020 */
-float voltageLTC2500 = 0;         /**< Stores the current sum of the voltage values of the LTC2500 */
-float voltageInternal = 0;        /**< Stores the current sum of the voltage values of the internal ADC. */
+int signalType = signalVoltage;   /**< Signal type sent to the PC. */
+float voltageAD4020 = 0;          /**< Stores the current voltage value of the AD4020 */
+float voltageLTC2500 = 0;         /**< Stores the current voltage value of the LTC2500 */
+float voltageInternal = 0;        /**< Stores the current voltage value of the internal ADC. */
 int64_t sumAD4020 = 0;            /**< Stores the current sum of the raw values of the AD4020. */
 int64_t sumLTC2500 = 0;           /**< Stores the current sum of the raw values of the LTC2500. */
 int64_t sumInternal = 0;          /**< Stores the current sum of the raw values of the internal ADC. */
@@ -336,47 +338,9 @@ void sendDataToPC() {
     full = false;
     return;
   }
-  // Debug to see if there are any irregularities within the data
-  /*float maxVal = 0;
-  for(int j=0; j<bufLen/4; j++) {}
-    uint32_t rawVal = 0;
-    rawVal += bufAD4020[i*4] << 0;
-    rawVal += bufAD4020[i*4 + 1] << 8;
-    rawVal += bufAD4020[i*4 + 2] << 16;
-    rawVal += bufAD4020[i*4 + 3] << 24;
-    float val = reinterpret_cast<float &>(rawVal);
-    if(abs(val) > maxVal) {
-      maxVal = abs(val);
-    }
-  if(maxVal > 100) {
-    T4dw(LED_3, HIGH);
-  }*/
-  int chunkLen = 4096;
-  int lastI = bufLen/chunkLen;
-  if(AD4020active) {
-    for(int i=0; i < bufLen/chunkLen; i++) {
-      uint8_t *arr = &bufAD4020[i*chunkLen];
-      T4sw(arr, chunkLen);
-    }
-    uint8_t *arr = &bufAD4020[lastI*chunkLen];
-    T4sw(arr, bufLen - lastI*chunkLen);
-  }
-  if(LTC2500active) {
-    for(int i=0; i < bufLen/chunkLen; i++) {
-      uint8_t *arr = &bufLTC2500[i*chunkLen];
-      T4sw(arr, chunkLen);
-    }
-    uint8_t *arr = &bufLTC2500[lastI*chunkLen];
-    T4sw(arr, bufLen - lastI*chunkLen);
-  }
-  if(INTERNALADCactive) {
-    for(int i=0; i < bufLen/chunkLen; i++) {
-      uint8_t *arr = &bufInternal[i*chunkLen];
-      T4sw(arr, chunkLen);
-    }
-    uint8_t *arr = &bufInternal[lastI*chunkLen];
-    T4sw(arr, bufLen - lastI*chunkLen);
-  }
+  if(AD4020active)      {T4sw(bufAD4020, bufLen);}
+  if(LTC2500active)     {T4sw(bufLTC2500, bufLen);}
+  if(INTERNALADCactive) {T4sw(bufInternal, bufLen);}
   request = false;
   full = false;
 }
@@ -516,17 +480,17 @@ bool checkUpdateUSB(String command) {
  *  @return numerical identifier for the respective command.
  */
 int checkCommand(String command) {
-  if(command.startsWith("set oversamples "))    {return settingOversamples;}
-  if(command.startsWith("set dataSize "))       {return settingSize;}
-  if(command.startsWith("set samplerate "))     {return settingSpectralFreq;}
-  if(command.startsWith("set processing rate ")){return settingProcessingFreq;}
-  if(command.startsWith("set triggerSource "))  {return settingTriggerSource;}
-  if(command.startsWith("set threshold "))      {return settingThreshold;}
-  if(command.startsWith("set flank "))          {return settingFlank;}
-  if(command.startsWith("activate "))           {return settingActivate;}
-  if(command.startsWith("deactivate "))         {return settingDeactivate;}
-  if(command.startsWith("set signalType "))     {return settingSignalType;}
-  if(command.startsWith("send data"))           {return commandRequest;}
+  if(command.startsWith("set oversamples "))      {return settingOversamples;}
+  if(command.startsWith("set dataSize "))         {return settingSize;}
+  if(command.startsWith("set samplerate "))       {return settingSpectralFreq;}
+  if(command.startsWith("set processing rate "))  {return settingProcessingFreq;}
+  if(command.startsWith("set triggerSource "))    {return settingTriggerSource;}
+  if(command.startsWith("set threshold "))        {return settingThreshold;}
+  if(command.startsWith("set flank "))            {return settingFlank;}
+  if(command.startsWith("activate "))             {return settingActivate;}
+  if(command.startsWith("deactivate "))           {return settingDeactivate;}
+  if(command.startsWith("set signalType "))       {return settingSignalType;}
+  if(command.startsWith("send data"))             {return commandRequest;}
   return INVALID;
 }
 
