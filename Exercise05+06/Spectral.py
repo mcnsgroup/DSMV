@@ -5,9 +5,12 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 23.05.2022, ver1.10
+# 24.05.2022, ver1.11
 # 
 # Changelog
+#   - 24.05.2022: fixed a bug that prevented the data buffer to be resized correctly,
+#                 fixed a bug that caused the wrong data to be saved,
+#                 fixed a bug that caused the program to stop reading data if updated too frequently
 #   - 23.05.2022: Fixed a bug that caused the serial buffer to overflow,
 #                 added functionality to disable phases on initilizing the GUI,
 #                 phase apperance change,
