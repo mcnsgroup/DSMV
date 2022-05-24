@@ -17,9 +17,12 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 23.05.2022, ver1.10
+# 24.05.2022, ver1.11
 # 
 # Changelog
+#   - 24.05.2022: fixed a bug that prevented the data buffer to be resized correctly,
+#                 fixed a bug that caused the wrong data to be saved,
+#                 fixed a bug that caused the program to stop reading data if updated too frequently
 #   - 23.05.2022: Fixed a bug that caused the serial buffer to overflow,
 #                 added functionality to disable phases on initilizing the GUI,
 #                 phase apperance change,
@@ -85,6 +88,7 @@
 
 # Import official modules
 from csv import Dialect
+from hashlib import new
 import numpy as np
 from matplotlib.pyplot import *
 from matplotlib.figure import Figure
@@ -142,7 +146,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05\nv1.10")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05\nv1.11")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -478,7 +482,7 @@ class SpectralGUI:
             self.fig1.savefig(path + ".svg")
             # save the data as text
             f = open(path + ".txt", mode = "w")
-            f.write(str(self.data[0]))
+            f.write(str(self.data))
             f.close
             # display the saved message
             self.saveLabel1.configure(text="Saved as " + path + "!")
@@ -724,12 +728,7 @@ class SpectralGUI:
         self.resetYSpectra()
 
     # Event handler for samplerate entry box
-    def handle_updateFreq(self, event=0, force=True):
-        # Stop reading during update
-        reactivate = False
-        if self.reading:
-            reactivate = True
-            self.reading = False
+    def handle_updateFreq(self, event=0, force=False):
         # Make sure the input is a number
         try:
             newSamplerate = float(self.freqEntry.get())
@@ -753,10 +752,6 @@ class SpectralGUI:
             pass
         self.samplerateV.set(str(self.samplerate))
         self.window.update_idletasks()
-        # Reactivate reading if paused by this function
-        if reactivate:
-            self.reading = True
-            self.window.after(0, self.readDisp)
     
     # Event handler for data size entry box
     def handle_updateSize(self, event=0, force=False):
@@ -773,14 +768,12 @@ class SpectralGUI:
                 newSize = self.dataSizeMin
             if newSize > self.dataSizeMax:
                 newSize = self.dataSizeMax
-            if newSize < self.dataSize:
-                self.data = self.data[self.dataSize-newSize:self.dataSize]
-                #self.data[1] = self.data[1][self.dataSize-newSize:self.dataSize]
-            else:
-                self.data = [0]*(newSize - self.dataSize) + self.data
-                #self.data[1] = [0]*(newSize - self.dataSize) + self.data[1]
             # Only update if the value has actually changed
             if newSize != self.dataSize or force:
+                if newSize < self.dataSize:
+                    self.data = self.data[self.dataSize-newSize:self.dataSize]
+                else:
+                    self.data = np.pad(self.data, (newSize - self.dataSize, 0))
                 # Update variable for data size
                 self.dataSize = newSize
                 # Write command to serial port
@@ -805,11 +798,6 @@ class SpectralGUI:
     
     # Event handler for oversamples entry box
     def handle_updateOvers(self, event=0, force=False):
-        # Stop reading during update
-        reactivate = False
-        if self.reading:
-            reactivate = True
-            self.reading = False
         # Make sure the input is an integer
         if self.oversEntry.get().isdigit():
             newOvers = int(self.oversEntry.get())
@@ -831,18 +819,9 @@ class SpectralGUI:
                 self.readNext = True
         self.oversamplesV.set(str(self.oversamples))
         self.window.update_idletasks()
-        # Reactivate reading if paused by this function
-        if reactivate:
-            self.reading = True
-            self.window.after(0, self.readDisp)
     
     # Event handler for processing rate input box
     def handle_updateProc(self, event=0, force=False):
-        # Stop reading during update
-        reactivate = False
-        if self.reading:
-            reactivate = True
-            self.reading = False
         # Make sure the input is a number
         try:
             newProc = float(self.procEntry.get())
@@ -864,12 +843,8 @@ class SpectralGUI:
                 self.readNext = True
         except ValueError:
             pass
-        self.procV.set(str(self.proc))#
+        self.procV.set(str(self.proc))
         self.window.update_idletasks()
-        # Reactivate reading if paused by this function
-        if reactivate:
-            self.reading = True
-            self.window.after(0, self.readDisp)
     
     # Reset the y-data and averaging of the spectra
     def resetYSpectra(self):
@@ -1073,7 +1048,7 @@ class SpectralGUI:
         self.transformSize1Entry["state"] = DISABLED
         self.transformSize2Entry["state"] = DISABLED
         self.transformSizeStatus.set("N_FT-1=N/2")
-        self.handle_updateSize()
+        self.handle_updateSize(force=True)
     
     # Function to check and possibly restore serial connection
     def checkConnection(self):
@@ -1114,6 +1089,7 @@ class SpectralGUI:
         if self.readNext:
             self.port.writeL("send data")
             self.readNext = False
+        #self.port.writeL("send data")
         # Read raw values
         rawValues = self.port.readB(self.dataSize*4)
         # Only process data, if there was any read
@@ -1124,11 +1100,11 @@ class SpectralGUI:
             # Prepare for next read
             self.readNext = True
             values = list(struct.unpack("%df" %self.dataSize, rawValues))
-            # Store the different parts to the different sub arrays of the data buffer
-            self.data = values#[0:self.dataSize]
             # Possibly subtract average
             if self.subtract.get() == "Enabled":
-                self.data = np.subtract(self.data, np.average(self.data))
+                values = np.subtract(values, np.average(values))
+            # Store the values to the data buffer
+            self.data = values
             # Debug test for values that are clearly out of range
             if max(np.abs(self.data)) > 100:
                 L.p("There was a misread: ")
