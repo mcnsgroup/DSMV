@@ -1187,7 +1187,7 @@ class SpectralGUI:
                 peakF = self.f2[peakIndex]
                 peak = S2[peakIndex]
                 self.maxAnnotation2.remove()
-                self.maxAnnotation2 = self.ax2.annotate("Peak\nf: " + L.fstr(peakF, 2) + "\ny: " + L.fstr(peak, 5), 
+                self.maxAnnotation2 = self.ax2.annotate("Peak\nf: " + L.fstr(peakF, 2) + "\ny: " + L.fstr(peak, 3), 
                     xy=(peakF, peak), xytext=(10, 15),
                     textcoords='offset points',
                     bbox=dict(alpha=0.5, fc="r"),
