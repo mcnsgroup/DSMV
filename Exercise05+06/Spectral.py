@@ -5,9 +5,11 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 24.05.2022, ver1.11
+# 30.05.2022, ver1.12
 # 
 # Changelog
+#   - 30.05.2022: Compatibility update for new USB protocol,
+#                 changed value displays to DSMVLib version
 #   - 24.05.2022: fixed a bug that prevented the data buffer to be resized correctly,
 #                 fixed a bug that caused the wrong data to be saved,
 #                 fixed a bug that caused the program to stop reading data if updated too frequently
