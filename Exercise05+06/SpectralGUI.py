@@ -17,9 +17,11 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 24.05.2022, ver1.11
+# 30.05.2022, ver1.12
 # 
 # Changelog
+#   - 30.05.2022: Compatibility update for new USB protocol,
+#                 changed value displays to DSMVLib version
 #   - 24.05.2022: fixed a bug that prevented the data buffer to be resized correctly,
 #                 fixed a bug that caused the wrong data to be saved,
 #                 fixed a bug that caused the program to stop reading data if updated too frequently
@@ -146,7 +148,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05\nv1.11")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-07\nv1.12")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -722,7 +724,7 @@ class SpectralGUI:
         time.sleep(0.1)
         self.port.writeL('deactivate Internal ADC')
         time.sleep(0.1)
-        self.port.writeL('activate ' + str(self.sourceSelect.get()))
+        self.port.writeL('set mode ' + str(self.sourceSelect.get()))
         self.port.clearBuffer()
         self.readNext = True
         self.resetYSpectra()
@@ -1089,7 +1091,6 @@ class SpectralGUI:
         if self.readNext:
             self.port.writeL("send data")
             self.readNext = False
-        #self.port.writeL("send data")
         # Read raw values
         rawValues = self.port.readB(self.dataSize*4)
         # Only process data, if there was any read
@@ -1173,7 +1174,7 @@ class SpectralGUI:
                 )
                 # Add first spectrum to the legend
                 self.plots += [self.spectrum1]
-                self.plotTitles += [self.window1.get() + " window, ENBW: %.3fHz" %self.enbw1]
+                self.plotTitles += [self.window1.get() + " window, ENBW: " + L.fstr(self.enbw1, 3) + "Hz"]
                 # Possibly update phase 1 and add it to the legend
                 if self.drawPhase:
                     self.phase1.set_ydata(np.divide(self.phase1Pre, self.averaged))
@@ -1186,7 +1187,7 @@ class SpectralGUI:
                 peakF = self.f2[peakIndex]
                 peak = S2[peakIndex]
                 self.maxAnnotation2.remove()
-                self.maxAnnotation2 = self.ax2.annotate('Peak\nf: %0.2f\ny: %0.5f' %(peakF, peak), 
+                self.maxAnnotation2 = self.ax2.annotate("Peak\nf: " + L.fstr(peakF, 2) + "\ny: " + L.fstr(peak, 5), 
                     xy=(peakF, peak), xytext=(10, 15),
                     textcoords='offset points',
                     bbox=dict(alpha=0.5, fc="r"),
@@ -1194,7 +1195,7 @@ class SpectralGUI:
                 )
                 # Add second spectrum to the legend
                 self.plots += [self.spectrum2]
-                self.plotTitles += [self.window2.get() + " window, ENBW: %.3fHz" %self.enbw2]
+                self.plotTitles += [self.window2.get() + " window, ENBW: " + L.fstr(self.enbw2, 3) + "Hz"]
                 # Possibly update phase 2 and add it to the legend
                 if self.drawPhase:
                     self.phase2.set_ydata(np.divide(self.phase2Pre, self.averaged))
@@ -1203,14 +1204,14 @@ class SpectralGUI:
             if self.powerState.get() != "Disabled":
                 # Add power integrator to the legend
                 self.plots += [self.dots]
-                self.plotTitles += ["Total power in selected band: %.6fV$^2$" %power]
+                self.plotTitles += ["Total power in selected band: " + L.fstr(power, 5) + "V$^2$"]
             # Draw the legend
             if self.drawPhase:
-                self.legend = self.ax3.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: %d" %self.averaged)
+                self.legend = self.ax3.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: " + L.fstr(self.averaged))
                 # Update the canvas for the phases
                 L.updateCanvas(self.fig2.canvas, self.ax3, False, True)
             else:
-                self.legend = self.ax2.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: %d" %self.averaged)
+                self.legend = self.ax2.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: " + L.fstr(self.averaged))
         self.window.update_idletasks()
         # Reschedule function (this is probably not the best solution)
         self.window.after(0, self.readDisp)
