@@ -5,9 +5,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 30.05.2022, ver1.12
+# 31.05.2022, ver1.13
 # 
 # Changelog
+#   - 31.05.2022: Fixed a bug that caused the spectral data to not be saved properly as text file
 #   - 30.05.2022: Compatibility update for new USB protocol,
 #                 changed value displays to DSMVLib version
 #   - 24.05.2022: fixed a bug that prevented the data buffer to be resized correctly,
