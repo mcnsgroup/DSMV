@@ -5,9 +5,11 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 03.06.2022, ver1.15
+# 07.06.2022, ver1.16
 # 
 # Changelog
+#   - 07.06.2022: Added normalization option to unit list,
+#                 added functionality to average impulse responses if applicable
 #   - 03.06.2022: Fixed a number of bugs related to power struggle between the event handlers
 #   - 01.06.2022: First merger features with ImpulseResponseGUI and FilterGUI,
 #                 fixed a bug that caused the updating of settings to interfere with the reading of data
