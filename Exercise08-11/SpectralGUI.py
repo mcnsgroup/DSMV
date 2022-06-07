@@ -17,11 +17,12 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 07.06.2022, ver1.16
+# 07.06.2022, ver1.16.1
 # 
 # Changelog
 #   - 07.06.2022: Added normalization option to unit list,
-#                 added functionality to average impulse responses if applicable
+#                 added functionality to average impulse responses if applicable,
+#                 fixed a bug that caused the spectrum to average twice
 #   - 03.06.2022: Fixed a number of bugs related to power struggle between the event handlers
 #   - 01.06.2022: First merger features with ImpulseResponseGUI and FilterGUI,
 #                 fixed a bug that caused the updating of settings to interfere with the reading of data
@@ -156,7 +157,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.16")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.16.1")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -608,7 +609,10 @@ class SpectralGUI:
         self.ax1.set_ylabel("Voltage AD4020 (V)")
         # Set time axis limits to match data
         self.ax1.set_xlim([0, tMax])
-        self.voltage, = self.ax1.plot(self.x, self.voltagePre, 'b.-', linewidth=0.5)
+        self.voltage, = self.ax1.plot(self.x, self.voltagePre, 'b.-', label="Impulse response", linewidth=0.5)
+        # Legend for time series
+        self.legendImpulse = self.ax1.legend(loc="upper right", title="Averaged impulse responses: 1")
+        # Create the canvas
         canvas1 = FigureCanvasTkAgg(self.fig1)
         canvas1.draw()
         self.uiElements.append(canvas1.get_tk_widget())
@@ -731,10 +735,10 @@ class SpectralGUI:
         # Check for phase setting
         if self.showPhase.get() == "Enabled":
             # Legend for frequency-phase diagram
-            self.legend = self.ax3.legend(self.plots, self.plotTitles, loc="upper right", title="Averaged spectra: 1")
+            self.legendSpectra = self.ax3.legend(self.plots, self.plotTitles, loc="upper right", title="Averaged spectra: 1")
         else:
             # Legend for frequency diagram
-            self.legend = self.ax2.legend(self.plots, self.plotTitles, loc="upper right", title="Averaged spectra: 1")
+            self.legendSpectra = self.ax2.legend(self.plots, self.plotTitles, loc="upper right", title="Averaged spectra: 1")
         # Draw the canvas
         canvas2 = FigureCanvasTkAgg(self.fig2)
         canvas2.draw()
@@ -930,6 +934,11 @@ class SpectralGUI:
                 # Update frequency indices in power integrator
                 self.handle_updateStartF()
                 self.handle_updateEndF()
+                # show impulse response legend
+                self.legendImpulse.set_visible(True)
+            # Possibly hide impulse response legend
+            if self.spectral:
+                self.legendImpulse.set_visible(False)
             self.port.writeL('set mode ' + str(self.mode))
             self.port.clearBuffer()
             self.readNext = True
@@ -1501,8 +1510,8 @@ class SpectralGUI:
             S1 = np.divide(self.S1Pre, self.averaged)
             S2 = np.divide(self.S2Pre, self.averaged)
         elif self.unitSelect.get() == "Normalized Spectrum":
-            S1 = np.divide(self.S1Pre, self.averaged * self.S1Pre[self.normIndex1[self.filterIndex]])
-            S2 = np.divide(self.S2Pre, self.averaged * self.S2Pre[self.normIndex2[self.filterIndex]])
+            S1 = np.divide(self.S1Pre, self.S1Pre[self.normIndex1[self.filterIndex]])
+            S2 = np.divide(self.S2Pre, self.S2Pre[self.normIndex2[self.filterIndex]])
         self.spectrum1.set_ydata(S1)
         self.spectrum2.set_ydata(S2)
         self.dots.set_ydata([S1[self.startFindex], S1[self.endFindex]])
@@ -1803,13 +1812,16 @@ class SpectralGUI:
                 # Add power integrator to the legend
                 self.plots += [self.dots]
                 self.plotTitles += ["Total power in selected band: " + L.fstr(power, 5) + "V$^2$"]
-            # Draw the legend
+            # Draw the legends
             if self.showPhase.get() == "Enabled":
-                self.legend = self.ax3.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: " + L.fstr(self.averaged))
+                self.legendSpectra = self.ax3.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: " + L.fstr(self.averaged))
                 # Update the canvas for the phases
                 L.updateCanvas(self.fig2.canvas, self.ax3, False, True)
             else:
-                self.legend = self.ax2.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: " + L.fstr(self.averaged))
+                self.legendSpectra = self.ax2.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: " + L.fstr(self.averaged))
+            # Legend for time series
+            if not self.spectral:
+                self.legendImpulse = self.ax1.legend(loc="upper right", title="Averaged impulse responses: " + L.fstr(self.averaged))
         self.window.update_idletasks()
         # Reschedule function (this is probably not the best solution)
         self.window.after(0, self.readDisp)
