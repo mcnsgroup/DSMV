@@ -17,9 +17,11 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 03.06.2022, ver1.15
+# 07.06.2022, ver1.16
 # 
 # Changelog
+#   - 07.06.2022: Added normalization option to unit list,
+#                 added functionality to average impulse responses if applicable
 #   - 03.06.2022: Fixed a number of bugs related to power struggle between the event handlers
 #   - 01.06.2022: First merger features with ImpulseResponseGUI and FilterGUI,
 #                 fixed a bug that caused the updating of settings to interfere with the reading of data
@@ -154,7 +156,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.15")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.16")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -298,10 +300,11 @@ class SpectralGUI:
         self.psLabel = "$\mathrm{PS\/ S}^\mathrm{V}\mathrm{\/(V}^2\mathrm{)}$"
         self.asdLabel = "$\mathrm{ASD\/ d}^\mathrm{V}\mathrm{\/(V}^2\mathrm{/}\sqrt{\mathrm{Hz}}\mathrm{)}$"
         self.asLabel = "$\mathrm{AS\/ s}^\mathrm{V}\mathrm{\/(V)}$"
+        self.normLabel = "|A(f)| (normalized)"
         # List of different spectrum unit labels
-        self.unitLabels = [self.psdLabel, self.psLabel, self.asdLabel, self.asLabel]
+        self.unitLabels = [self.psdLabel, self.psLabel, self.asdLabel, self.asLabel, self.normLabel]
         # List of different spectrum units
-        self.unitList = ["Power Spectral Density", "Power Spectrum", "Amplitude Spectral Density", "Amplitude Spectrum"]
+        self.unitList = ["Power Spectral Density", "Power Spectrum", "Amplitude Spectral Density", "Amplitude Spectrum", "Normalized Spectrum"]
         # Create combo box for spectrum unit selector
         self.unitSelect = ttk.Combobox(master=self.avgUnitFrame, values = self.unitList, state="readonly")
         self.uiElements.append(self.unitSelect)
@@ -436,6 +439,7 @@ class SpectralGUI:
         self.uiElements.append(self.phaseEnButton)
         self.uiGridParams.append([0, 1, 1, 1, "W"])
         self.phaseEnButton.bind("<Button-1>", self.handle_phaseEn)
+        
         
         
         
@@ -597,12 +601,14 @@ class SpectralGUI:
         tMax = (self.dataSize-1)*self.oversamples/self.samplerate
         # Create values for time axis
         self.x = np.linspace(0, tMax, self.dataSize)
+        # Create array to hold current impulse response (pre averaging)
+        self.voltagePre = self.data
         self.ax1 = self.fig1.add_subplot(111)
         self.ax1.set_xlabel("Time (s)")
         self.ax1.set_ylabel("Voltage AD4020 (V)")
         # Set time axis limits to match data
         self.ax1.set_xlim([0, tMax])
-        self.voltage, = self.ax1.plot(self.x, self.data, 'b.-', linewidth=0.5)
+        self.voltage, = self.ax1.plot(self.x, self.voltagePre, 'b.-', linewidth=0.5)
         canvas1 = FigureCanvasTkAgg(self.fig1)
         canvas1.draw()
         self.uiElements.append(canvas1.get_tk_widget())
@@ -646,6 +652,12 @@ class SpectralGUI:
         # Number of frequencies
         self.freqs1 = int(np.ceil((self.dataSize+1)/2))
         self.freqs2 = int(np.ceil((self.dataSize+1)/2))
+        # Default indices of the amplitude response to norm on
+        self.normIndexDefault1 = [0, 0, 0, self.freqs1-2, -1, 0, 0, self.freqs1-2, 0, 0, None]
+        self.normIndexDefault2 = [0, 0, 0, self.freqs2-2, -1, 0, 0, self.freqs2-2, 0, 0, None]
+        # Index of the amplitude response to norm on
+        self.normIndex1 = self.normIndexDefault1
+        self.normIndex2 = self.normIndexDefault2
         # Create values for frequency axis
         self.f1 = np.linspace(0, fMax, self.freqs1)
         self.f2 = np.linspace(0, fMax, self.freqs2)
@@ -687,20 +699,20 @@ class SpectralGUI:
 		)
         self.maxAnnotation2.set_visible(False)
         # Potentially create phases
-        if self.showPhase.get() == "Enabled":
-            # Create arrays to hold current phases (pre averaging)
-            self.phase1Pre = [0] * self.freqs1
-            self.phase2Pre = [0] * self.freqs2
-            # Possibly omit zero frequency
-            if not self.spectral:
-                self.phase1Pre = self.phase1Pre[1:len(self.phase1Pre)]
-                self.phase2Pre = self.phase2Pre[1:len(self.phase2Pre)]
-            # Create axis for phase
-            self.ax3 = self.ax2.twinx()
-            self.ax3.set_ylabel('Phase')
-            # Create phases
-            self.phase1, = self.ax3.plot(self.f1, self.phase1Pre, "b.", label=self.windows[0] + " window phase", markersize=1)
-            self.phase2, = self.ax3.plot(self.f2, self.phase2Pre, "r.", label=self.windows[0] + " window phase", markersize=1)
+        #if self.showPhase.get() == "Enabled":
+        # Create arrays to hold current phases (pre averaging)
+        self.phase1Pre = [0] * self.freqs1
+        self.phase2Pre = [0] * self.freqs2
+        # Possibly omit zero frequency
+        if not self.spectral:
+            self.phase1Pre = self.phase1Pre[1:len(self.phase1Pre)]
+            self.phase2Pre = self.phase2Pre[1:len(self.phase2Pre)]
+        # Create axis for phase
+        self.ax3 = self.ax2.twinx()
+        self.ax3.set_ylabel('Phase')
+        # Create phases
+        self.phase1, = self.ax3.plot(self.f1, self.phase1Pre, "b.", label=self.windows[0] + " window phase", markersize=1)
+        self.phase2, = self.ax3.plot(self.f2, self.phase2Pre, "r.", label=self.windows[0] + " window phase", markersize=1)
         # Start and end frequencies for the signal power integrator
         self.startF = 0
         self.endF = fMax
@@ -823,6 +835,8 @@ class SpectralGUI:
         self.handle_disablePower()
         self.updateAll(True)
         self.handle_updateWindow2()
+        # Initially hide phases
+        self.handle_phaseDis()
         # Display the widgets
         L.buildUI(self.uiElements, self.uiGridParams)
         # Display correct filter parameters
@@ -911,6 +925,8 @@ class SpectralGUI:
                 self.handle_updateFreq()
                 self.freqEntry["state"] = DISABLED
                 self.spectral = False
+                self.unitSelect.set("Normalized Spectrum")
+                self.handle_updateUnit()
                 # Update frequency indices in power integrator
                 self.handle_updateStartF()
                 self.handle_updateEndF()
@@ -1484,6 +1500,9 @@ class SpectralGUI:
         elif self.unitSelect.get() == "Amplitude Spectrum":
             S1 = np.divide(self.S1Pre, self.averaged)
             S2 = np.divide(self.S2Pre, self.averaged)
+        elif self.unitSelect.get() == "Normalized Spectrum":
+            S1 = np.divide(self.S1Pre, self.averaged * self.S1Pre[self.normIndex1[self.filterIndex]])
+            S2 = np.divide(self.S2Pre, self.averaged * self.S2Pre[self.normIndex2[self.filterIndex]])
         self.spectrum1.set_ydata(S1)
         self.spectrum2.set_ydata(S2)
         self.dots.set_ydata([S1[self.startFindex], S1[self.endFindex]])
@@ -1509,8 +1528,12 @@ class SpectralGUI:
         self.readNext = True
     
     # Callback function for changing the subtraction to "Disabled"
-    def handle_phaseDis(self, event):
+    def handle_phaseDis(self, event=0):
         self.showPhase.set("Disabled")
+        # Hide phases
+        self.phase1.set_visible(False)
+        self.phase2.set_visible(False)
+        self.ax3.set_visible(False)
         # Update the axes
         self.updateAxes()
         # Clear serial buffer
@@ -1524,11 +1547,16 @@ class SpectralGUI:
         self.phase1Pre = [0] * self.freqs1
         self.phase2Pre = [0] * self.freqs2
         # Create axis for phase
-        self.ax3 = self.ax2.twinx()
-        self.ax3.set_ylabel('Phase')
-        # Create phases
-        self.phase1, = self.ax3.plot(self.f1, [0] * (self.freqs1), "b.", label=self.windows[0] + " window phase", markersize=1)
-        self.phase2, = self.ax3.plot(self.f2, [0] * (self.freqs2), "r.", label=self.windows[0] + " window phase", markersize=1)
+        #self.ax3 = self.ax2.twinx()
+        #self.ax3.set_ylabel('Phase')
+        # Display phases
+        if self.window1.get() != "Disabled":
+            self.phase1.set_visible(True)
+        if self.window2.get() != "Disabled":
+            self.phase2.set_visible(True)
+        self.ax3.set_visible(True)
+        #self.phase1, = self.ax3.plot(self.f1, [0] * (self.freqs1), "b.", label=self.windows[0] + " window phase", markersize=1)
+        #self.phase2, = self.ax3.plot(self.f2, [0] * (self.freqs2), "r.", label=self.windows[0] + " window phase", markersize=1)
         # Update the axes
         self.updateAxes()
         # Clear serial buffer
@@ -1692,6 +1720,10 @@ class SpectralGUI:
                 X2 = X2[1:len(X2)]
             # Possibly average spectra and possibly calculate phases
             if self.averaging.get():
+                if not self.spectral:
+                    self.voltagePre = np.add(self.voltagePre, self.data)
+                else:
+                    self.voltagePre = self.data
                 self.S1Pre += abs(X1)
                 self.S2Pre += abs(X2)
                 if self.showPhase.get() == "Enabled":
@@ -1699,6 +1731,7 @@ class SpectralGUI:
                     self.phase2Pre += np.angle(X2)
                 self.averaged += 1
             else:
+                self.voltagePre = self.data
                 self.S1Pre = abs(X1)
                 self.S2Pre = abs(X2)
                 if self.showPhase.get() == "Enabled":
@@ -1706,7 +1739,10 @@ class SpectralGUI:
                     self.phase2Pre = np.angle(X2)
                 self.averaged = 1
             # Display the values
-            self.voltage.set_ydata(self.data)
+            if not self.spectral:
+                self.voltage.set_ydata(np.divide(self.voltagePre, self.averaged))
+            else:
+                self.voltage.set_ydata(self.voltagePre)
             # Multiply based on the selected unit
             self.handle_updateUnit()
             # Update the canvas for the time series
