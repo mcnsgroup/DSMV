@@ -1,5 +1,13 @@
-# Version 0.2.13
+# Version 0.2.18
 # Changelog
+#	- 08.06.2022: Fixed a bug in logarithmic axis scaling,
+#				  fixed a bug in number formating for Inf and NaN values,
+#				  fixed a bug that caused the y-axis to not take into account all visible plots
+#	- 07.06.2022: Added functionality to correctly rescale axes where matplotlib fails
+#	- 31.05.2022: Fixed a bug that caused the consecutive file naming to sort the files incorrectly
+#	- 30.05.2022: Changed data tip annotation to automatic string formatting,
+#				  added functionality to auto format integers
+#	- 17.05.2022: Added functionality to format a number automatically
 #	- 16.05.2022: Added functionality to disable data tip via function
 #	- 12.05.2022: Added option for background color to data tip
 #	- 10.05.2022: Added functionality for data tips
@@ -14,7 +22,8 @@
 #   - 05.04.2022: Added license directly to sourcecode
 #   - 31.03.2022: Removed documentation about custom usage since the library is now available on PyPI,
 #                 fixed a bug in the buffer clearing of the serial port
-#   - 14.02.2022: Created a workaround for a bug that caused the serial buffer to not clear properly unless updating some specific element in a gui
+#   - 14.02.2022: Created a workaround for a bug that caused the serial buffer to not clear properly
+#				  unless updating some specific element in a gui
 #   - 26.01.2022: Fixed a bug that caused writing to a port to fail after a reconnect,
 #                 lowered reconnect speed in favour of stability
 #   - 19.01.2022: Added functionality to read data from a serial port via a thread
@@ -70,6 +79,27 @@ def pln(*args):
     if len(args) > 0:
         p(args[0])
     print()
+
+# Converts a number to a string choosing an apopropriate format
+# 
+# @param a Number to be formatted
+# @param point Optional number of decimals after the point (2 by default if applicable)
+def fstr(a, point=2):
+	# Check type of number
+	if isinstance(a, (int, np.integer)):
+		return "{0:d}".format(a)
+	elif np.isnan(a):
+		return "NaN"
+	elif np.isinf(a):
+		return "Inf"
+	elif int(a) == a:
+		return fstr(int(a))
+	else:
+		# Check if the numbers absolute value is too small to be displayed
+		if abs(a) < pow(10, -point):
+			return "{0:.{1}e}".format(a, point)
+		else:
+			return "{0:.{1}f}".format(a, point)
 
 # Calculates the euklidian distance between two points
 # 
@@ -171,7 +201,7 @@ class dataTip:
 
 	# (Re-) Draws the annotation
 	def drawAnnotation(self):
-		self.annotation = self.ax.annotate('x: %0.2f\ny: %0.2f' %(self.x1, self.y1), 
+		self.annotation = self.ax.annotate("x: " + fstr(self.x1, 2) + "\ny: " + fstr(self.y1, 2), 
 		    xy=(self.x1, self.y1), xytext=(10, 15),
 		    textcoords='offset points',
 		    bbox=dict(alpha=0.5, fc=self.faceColor),
@@ -232,38 +262,93 @@ def toFloat(a):
 # @param dir Directory to place the file in, relative to the working directory.
 def savePath(name, dir):
     # get all previously saved files
-    files=sorted(glob.glob(dir + name + " *.*"))
+    files=glob.glob(dir + name + " *.*")
     # get highest number of a file
-    FilesMax = ""
+    FilesMax = 0
     if len(files) > 0:
         # calculate number of characters before enumeration
         numStart = len(dir + name + " ")
         # calculate number of characters after enumeration
-        numCrop = len(files[len(files) - 1]) - files[len(files) - 1].rindex(".")
-        FilesMax = files[len(files) - 1][numStart:-numCrop]
-    if FilesMax == "" or not FilesMax.isdigit():
-        FilesMax = 0
-    else:
-        FilesMax = int(FilesMax)
+        numCrop = len(files[0]) - files[0].rindex(".")
+        for f in files:
+        	fNum = f[numStart:-numCrop]
+        	if int(fNum) > FilesMax:
+        		FilesMax = int(fNum)
     # Return String to save file
     return dir + name + " " + str(FilesMax + 1)
 
 # Window to bind events to
 window = None
 
+# Rescales an axis with optional keeping of previous limits.
+# 
+# @param ax The axis to be rescaled.
+# @param rescaleX Wheter or not to rescale the x-axis.
+# @param rescaleY Wheter or not to rescale the y-axis.
+def rescaleAx(ax, rescaleX=True, rescaleY=True):
+	if not (rescaleX or rescaleY):
+		return
+	# get all lines on the axis
+	allLines = ax.lines
+	# list to hold only visible lines
+	lines = []
+	# only consider lines that are visible
+	for line in allLines:
+		if line.get_visible():
+			lines.append(line)
+	if len(lines) == 0:
+		return
+	if rescaleX:
+		xData = lines[0].get_xdata()
+		minX = min(xData)
+		maxX = max(xData)
+		for line in lines:
+			xData = line.get_xdata()
+			curMin = min(xData)
+			curMax = max(xData)
+			if curMin < minX:
+				minX = curMin
+			if curMax > maxX:
+				maxX = curMax
+		# Catch invalid data
+		if np.isinf(minX) or np.isnan(minX) or np.isinf(maxX) or np.isnan(maxX):
+			return
+		if ax.get_xscale() == "linear":
+			spaceX = (maxX - minX) / 20
+			ax.set_xlim(minX - spaceX, maxX + spaceX)
+		else:
+			if minX <= 0:
+				return
+			spaceX = np.log(maxX / minX) / 20
+			ax.set_xlim(minX / np.exp(spaceX), maxX * np.exp(spaceX))
+	if rescaleY:
+		yData = lines[0].get_ydata()
+		minY = min(yData)
+		maxY = max(yData)
+		for line in lines:
+			yData = line.get_ydata()
+			curMin = min(yData)
+			curMax = max(yData)
+			if curMin < minY:
+				minY = curMin
+			if curMax > maxY:
+				maxY = curMax
+		# Catch invalid data
+		if np.isinf(minY) or np.isnan(minY) or np.isinf(maxY) or np.isnan(maxY):
+			return
+		if ax.get_yscale() == "linear":
+			spaceY = (maxY - minY) / 20
+			ax.set_ylim(minY - spaceY, maxY + spaceY)
+		else:
+			if minY <= 0:
+				return
+			spaceY = np.log(maxY / minY) / 20
+			ax.set_ylim(minY / np.exp(spaceY), maxY * np.exp(spaceY))
+
 # Updates a canvas with axis in it
 def updateCanvas(canvas, ax, rescaleX=True, rescaleY=True):
-    # store previous axes limits
-    xl = ax.get_xlim()
-    yl = ax.get_ylim()
-    # Refit plot to data
-    ax.relim()
-    ax.autoscale()
-    # Possibly keep previous axis limits
-    if not rescaleX:
-        ax.set_xlim(xl)
-    if not rescaleY:
-        ax.set_xlim(yl)
+    # Rescale the axis
+    rescaleAx(ax, rescaleX, rescaleY)
     # Update canvas
     canvas.draw()
     # Flush events (if this was called by a tkinter event)
