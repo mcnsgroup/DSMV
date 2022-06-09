@@ -5,9 +5,15 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 07.06.2022, ver1.16.1
+# 09.06.2022, ver1.17
 # 
 # Changelog
+#   - 09.06.2022: Changed modelling of transfer function to complex data for all filters except high pass 1st order,
+#                 added missing phase models,
+#                 changed color of models to green
+#                 fixed a bug that caused the phase to not be updated when necessary
+#   - 08.06.2022: Added functionality to display modeled frequency responses and phases
+#                 fixed a bug that caused the reading to not continue after a filter settings update
 #   - 07.06.2022: Added normalization option to unit list,
 #                 added functionality to average impulse responses if applicable,
 #                 fixed a bug that caused the spectrum to average twice
