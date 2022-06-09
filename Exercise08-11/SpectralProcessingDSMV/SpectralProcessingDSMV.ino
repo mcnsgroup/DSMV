@@ -7,10 +7,14 @@
  *  
  *  @author Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
  *  @author Philipp Rahe (prahe@uos.de)
- *  @date 03.06.2022
- *  @version 1.5.1
+ *  @date 08.06.2022
+ *  @version 1.5.3
  *  
  *  @par Changelog
+ *  - 08.06.2022: Fixed a bug that caused the FIR filter to not be recalculated on a property update
+ *  - 07.06.2022: Changed maximum cycle length for impulse response mode to match maximum data size even for step response,
+ *                added option to configure filter window via USB protocol,
+ *                fixed a bug that caused the filter properties to not be updated properly for FIR filters
  *  - 03.06.2022: Changed spectral reading to occur in tandem with filter processing
  *                while not in spectral operation mode
  *  - 02.06.2022: Fixed a bug that caused the one-parameter filters 
@@ -81,7 +85,8 @@ bool integerArithmetic = false; /**< Specifies whether integer or float arithmet
 #define settingFilterProperty1 7    /**< Setting for the (1st) filter porperty. */
 #define settingFilterProperty2 8    /**< Setting for the 2nd filter porperty. */
 #define settingFilterProperty3 9    /**< Setting for the 3rd filter porperty. */
-#define commandRequest 10           /**< Command for requesting data to be sent to the PC. */
+#define settingFilterProperty4 10   /**< Setting for the 4rd filter porperty. */
+#define commandRequest 11           /**< Command for requesting data to be sent to the PC. */
 #define signalVoltage 0             /**< Voltage read from ADCs. */
 #define signalRaw 1                 /**< Raw value read from ADCs. */
 #define INVALID -1                  /**< Invalid command. */
@@ -288,7 +293,7 @@ void blinking() {
 
 
 int nproc = 0;
-int nmax = 1000;
+int nmax = bufLen / 2;
 
 /** @brief Interrupt routine for ADC reading, processing, and signal output
  */
@@ -380,16 +385,17 @@ void readProcessOutput() {
 
 
 #define rectWin       0         // Rechteckfenster
-#define HammingWin    1         // Hammingfenster
+#define hammingWin    1         // Hammingfenster
+uint8_t window = rectWin;
 
 #define MfilterMax 70        // Maximum half filter order
 const uint16_t NfilterMax = 2*MfilterMax + 1;       // Maximum filter order plus 1.
-uint16_t Mfilter = 0;      // Half filter order
-uint16_t Nfilter = 2*Mfilter + 1;       // Filter order plus 1.
-uint16_t Mfilter1 = 0;
-uint16_t Mfilter2 = 0;
-uint16_t Mfilter3 = 0;
-uint16_t Mfilter4 = 0;
+//uint16_t Mfilter = 0;      // Half filter order
+//uint16_t Nfilter = 2*Mfilter + 1;       // Filter order plus 1.
+//uint16_t Mfilter1 = 0;
+//uint16_t Mfilter2 = 0;
+//uint16_t Mfilter3 = 0;
+//uint16_t Mfilter4 = 0;
 float filtercoeff[NfilterMax];                      // Filterkoeffizienten
 float dataBuffer[NfilterMax];                  // Wertepuffer
 int32_t dataBufferInt[NfilterMax];                  // Wertepuffer (Rohwerte)
@@ -399,11 +405,11 @@ double phi = 2 * PI * filterProperties[bandpass][0] / processingRate;   // Digit
 double phihigh = 2 * PI * filterProperties[bandpass][1] / processingRate; // Digitale Frequenz des Filters
 
 
-float windowfunc(float hi, int i, uint8_t window) {
+float windowfunc(float hi, int i) {
   float hw = 0;
-  if(window == HammingWin) {
+  if(window == hammingWin) {
     // Hamming Fenster
-    hw = hi * (0.54 - 0.46 * cos(2 * PI * i / (Nfilter - 1)));       
+    hw = hi * (0.54 - 0.46 * cos(2 * PI * i / (filterProperties[filter][2] - 1)));       
   } else {
     hw = hi;
   }
@@ -412,12 +418,14 @@ float windowfunc(float hi, int i, uint8_t window) {
 
 
 void init_fir() {
-  initializeFilter(filter, HammingWin, filterProperties[filter]);
+  initializeFilter(filter, filterProperties[filter]);
   //init_fir_bandpass();
 }
 
 // initialisiert die Filterkoeffizienten h_k mit dem angegebenen Typ
-void initializeFilter(uint8_t type, uint8_t window, float props[]) {
+void initializeFilter(uint8_t type, float props[]) {
+  uint16_t Nfilter = filterProperties[filter][2];
+  uint16_t Mfilter = (filterProperties[filter][2]-1)/2;
   switch(type) {
     // Moving average
     case movingAvg: 
@@ -432,8 +440,8 @@ void initializeFilter(uint8_t type, uint8_t window, float props[]) {
       phi = 2 * PI * props[0] / processingRate;
       for(int i = 0; i < Nfilter; i++) {
         double hk = sin(phi * (i - Mfilter)) / (PI * (i - Mfilter));
-        filtercoeff[i] = windowfunc(hk, i, window);
-        filtercoeffInt[i] = windowfunc(1000000 * hk, i, window);
+        filtercoeff[i] = windowfunc(hk, i);
+        filtercoeffInt[i] = windowfunc(1000000 * hk, i);
         //T4pln(filtercoeff[i]*1000);
       }
       filtercoeff[Mfilter] = phi / PI;
@@ -450,8 +458,8 @@ void initializeFilter(uint8_t type, uint8_t window, float props[]) {
       phi = 2 * PI * props[0] / processingRate;
       for(int i = 0; i < Nfilter; i++) {
         double hk = -sin(phi * (i - Mfilter)) / (PI * (i - Mfilter)); 
-        filtercoeff[i] = windowfunc(hk, i, window);
-        filtercoeffInt[i] = windowfunc(1000000 * hk, i, window);
+        filtercoeff[i] = windowfunc(hk, i);
+        filtercoeffInt[i] = windowfunc(1000000 * hk, i);
       }
       filtercoeff[Mfilter] = (1-phi / PI);
       filtercoeffInt[Mfilter] = 1000000 * (1-phi / PI);
@@ -463,8 +471,8 @@ void initializeFilter(uint8_t type, uint8_t window, float props[]) {
       phihigh = 2 * PI * props[1] / processingRate;
       for(int i = 0; i < Nfilter; i++) {
         double hk = ((sin(phihigh * (i - Mfilter)) - sin(phi * (i - Mfilter))) / (PI * (i - Mfilter)));
-        filtercoeff[i] = windowfunc(hk, i, window);
-        filtercoeffInt[i] = windowfunc(1000000 * hk, i, window);
+        filtercoeff[i] = windowfunc(hk, i);
+        filtercoeffInt[i] = windowfunc(1000000 * hk, i);
       }
       filtercoeffInt[Mfilter] = 1000000 * ((phihigh-phi) / PI);
       filtercoeff[Mfilter] = ((phihigh-phi) / PI);
@@ -476,8 +484,8 @@ void initializeFilter(uint8_t type, uint8_t window, float props[]) {
       phihigh = 2 * PI * props[1] / processingRate;
       for(int i = 0; i < Nfilter; i++) {
         double hk = -((sin(phihigh * (i - Mfilter)) - sin(phi * (i - Mfilter))) / (PI * (i - Mfilter)));
-        filtercoeff[i] = windowfunc(hk, i, window);
-        filtercoeffInt[i] = windowfunc(1000000 * hk, i, window);
+        filtercoeff[i] = windowfunc(hk, i);
+        filtercoeffInt[i] = windowfunc(1000000 * hk, i);
       }
       filtercoeff[Mfilter] = (1-(phihigh-phi) / PI);
       filtercoeffInt[Mfilter] = 1000000 * (1-(phihigh-phi) / PI);
@@ -489,6 +497,7 @@ void initializeFilter(uint8_t type, uint8_t window, float props[]) {
  *  
  */
 float proc_fir(float xn, float props[]) {
+  uint16_t Nfilter = filterProperties[filter][2];
   dataBuffer[fir_bufPos] = xn;  // Wert vom LTC2500 in Wertepuffer schreiben
   dataBufferInt[fir_bufPos] = 1000000.0 * xn;  // Wert vom LTC2500 (multipliziert mit 10^6) in Wertepuffer schreiben
   fir_bufPos = (fir_bufPos + 1) % Nfilter;              // Zur nächsten Position
@@ -589,6 +598,7 @@ bool checkUpdateUSB(String command) {
                                 break;
     case settingSize:           command.remove(0, 13);
                                 bufLen = min(4*command.toInt(), maxLen);
+                                nmax = bufLen / 2;
                                 return true;
                                 break;
     case settingSpectralFreq:   command.remove(0, 15);
@@ -638,26 +648,26 @@ bool checkUpdateUSB(String command) {
                                                   return true;
                                                   break;
                                   case bandpass:  filter = bandpass;
-                                                  Mfilter = Mfilter1;
-                                                  Nfilter = 2*Mfilter + 1;
+                                                  //Mfilter = Mfilter1;
+                                                  //Nfilter = 2*Mfilter + 1;
                                                   init_fir();
                                                   return true;
                                                   break;
                                   case bandstop:  filter = bandstop;
-                                                  Mfilter = Mfilter2;
-                                                  Nfilter = 2*Mfilter + 1;
+                                                  //Mfilter = Mfilter2;
+                                                  //Nfilter = 2*Mfilter + 1;
                                                   init_fir();
                                                   return true;
                                                   break;
                                   case FIRlow:    filter = FIRlow;
-                                                  Mfilter = Mfilter3;
-                                                  Nfilter = 2*Mfilter + 1;
+                                                  //Mfilter = Mfilter3;
+                                                  //Nfilter = 2*Mfilter + 1;
                                                   init_fir();
                                                   return true;
                                                   break;
                                   case FIRhigh:   filter = FIRhigh;
-                                                  Mfilter = Mfilter4;
-                                                  Nfilter = 2*Mfilter + 1;
+                                                  //Mfilter = Mfilter4;
+                                                  //Nfilter = 2*Mfilter + 1;
                                                   init_fir();
                                                   return true;
                                                   break;
@@ -679,30 +689,70 @@ bool checkUpdateUSB(String command) {
                                 filterProperties[filter][0] = command.toFloat();
                                 resetHistory();
                                 if(filter == scaling) {scalingGain = filterProperties[filter][0];}
+                                switch(filter) {
+                                  case bandpass:  init_fir();
+                                                  return true;
+                                                  break;
+                                  case bandstop:  init_fir();
+                                                  return true;
+                                                  break;
+                                  case FIRlow:    init_fir();
+                                                  return true;
+                                                  break;
+                                  case FIRhigh:   init_fir();
+                                                  return true;
+                                                  break;
+                                }
                                 break;
     case settingFilterProperty2:command.remove(0, 20);
                                 filterProperties[filter][1] = command.toFloat();
-                                break;
-    case settingFilterProperty3:command.remove(0, 20);
-                                Mfilter = min(max(command.toInt(), 0) / 2, MfilterMax);
-                                Nfilter = 2*Mfilter + 1;
                                 switch(filter) {
-                                  case bandpass:  Mfilter1 = Mfilter;
-                                                  init_fir();
+                                  case bandpass:  init_fir();
                                                   return true;
                                                   break;
-                                  case bandstop:  Mfilter2 = Mfilter;
-                                                  init_fir();
+                                  case bandstop:  init_fir();
                                                   return true;
                                                   break;
-                                  case FIRlow:    Mfilter3 = Mfilter;
-                                                  init_fir();
+                                  case FIRlow:    init_fir();
                                                   return true;
                                                   break;
-                                  case FIRhigh:   Mfilter4 = Mfilter;
-                                                  init_fir();
+                                  case FIRhigh:   init_fir();
                                                   return true;
                                                   break;
+                                }
+                                break;
+    case settingFilterProperty3:{
+                                  command.remove(0, 20);
+                                  uint16_t Mfilter = min(max(command.toInt(), 0) / 2, MfilterMax);
+                                  uint16_t Nfilter = 2*Mfilter + 1;
+                                  filterProperties[filter][2] = Nfilter;
+                                  switch(filter) {
+                                    case bandpass:  init_fir();
+                                                    return true;
+                                                    break;
+                                    case bandstop:  init_fir();
+                                                    return true;
+                                                    break;
+                                    case FIRlow:    init_fir();
+                                                    return true;
+                                                    break;
+                                    case FIRhigh:   init_fir();
+                                                    return true;
+                                                    break;
+                                  }
+                                  return true;
+                                  break;
+                                }
+    case settingFilterProperty4:command.remove(0, 20);
+                                switch(checkWindow(command)) {
+                                  case rectWin:     window = rectWin;
+                                                    init_fir();
+                                                    return true;
+                                                    break;
+                                  case hammingWin:  window = hammingWin;
+                                                    init_fir();
+                                                    return true;
+                                                    break;
                                 }
                                 return true;
                                 break;
@@ -729,6 +779,7 @@ bool checkUpdateUSB(String command) {
  *  set filterProperty1   ->  settingFilterProperty1
  *  set filterProperty2   ->  settingFilterProperty2
  *  set filterProperty3   ->  settingFilterProperty3
+ *  set filterProperty4   ->  settingFilterProperty4
  *  send data             ->  commandRequest
  *
  *  @param command Command (in ASCII format) as received from PC
@@ -744,6 +795,7 @@ int checkCommand(String command) {
   if(command.startsWith("set filterProperty1 "))  {return settingFilterProperty1;}
   if(command.startsWith("set filterProperty2 "))  {return settingFilterProperty2;}
   if(command.startsWith("set filterProperty3 "))  {return settingFilterProperty3;}
+  if(command.startsWith("set filterProperty4 "))  {return settingFilterProperty4;}
   if(command.startsWith("set signalType "))       {return settingSignalType;}
   if(command.startsWith("send data"))             {return commandRequest;}
   return INVALID;
@@ -817,5 +869,21 @@ int checkFilter(String command) {
 int checkSignalType(String command) {
   if(command.startsWith("voltage")) {return signalVoltage;}
   if(command.startsWith("raw"))     {return signalRaw;}
+  return INVALID;
+}
+
+/** @brief Maps the ASCII command for windows to IDs.
+ *
+ *  Currently implemented are the maps:
+ *
+ *  Rectangle ->  rectWin
+ *  Hamming   ->  hamminWin
+ *
+ *  @param command Window names (in ASCII format) as received from PC
+ *  @return numerical identifier for the respective window.
+ */
+int checkWindow(String command) {
+  if(command.startsWith("Rectangle")) {return rectWin;}
+  if(command.startsWith("Hamming"))   {return hammingWin;}
   return INVALID;
 }
