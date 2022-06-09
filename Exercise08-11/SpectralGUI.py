@@ -17,12 +17,20 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 07.06.2022, ver1.16.1
+# 09.06.2022, ver1.17
 # 
 # Changelog
+#   - 09.06.2022: Changed modelling of transfer function to complex data for all filters except high pass 1st order,
+#                 added missing phase models,
+#                 changed color of models to green
+#                 fixed a bug that caused the phase to not be updated when necessary
+#   - 08.06.2022: Added functionality to display modeled frequency responses and phases
+#                 fixed a bug that caused the reading to not continue after a filter settings update
 #   - 07.06.2022: Added normalization option to unit list,
 #                 added functionality to average impulse responses if applicable,
-#                 fixed a bug that caused the spectrum to average twice
+#                 fixed a bug that caused the spectrum to average twice,
+#                 fixed a bug that caused the phase plot to not update properly
+#                 added hierarchy control to all parameters
 #   - 03.06.2022: Fixed a number of bugs related to power struggle between the event handlers
 #   - 01.06.2022: First merger features with ImpulseResponseGUI and FilterGUI,
 #                 fixed a bug that caused the updating of settings to interfere with the reading of data
@@ -157,7 +165,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.16.1")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.17")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -550,16 +558,45 @@ class SpectralGUI:
         self.prop4Label = Label(master=self.filterFrame, text=self.prop4Names[filterDefIndex])
         self.uiElements.append(self.prop4Label)
         self.uiGridParams.append([4, 0, 1, 1, "E"])
+        # Value type for the filter property 4
+        self.prop4Type = ["", "", "", "", "String", "String", "String", "String", "", "", ""]
         # Default values for the filter property 4 (later current values)
         self.prop4Value = [None, None, None, None, "Rectangle", "Rectangle", "Rectangle", "Rectangle", None, None, None]
+        # Minimum values for the filter property 4
+        self.prop4Min = [None, None, None, None, None, None, None, None, None, None, None]
+        # Maximum values for the filter property 4
+        self.prop4Max = [None, None, None, None, None, None, None, None, None, None, None]
+        # Variable to control content of the filter property 4 entry box
+        self.prop4V = StringVar()
+        self.prop4V.set(str(self.prop4Value[filterDefIndex]))
         # List of different window functions
         self.windows = ["Rectangle", "Hamming"]
         # Create combo box for window selector
         self.windowSelect = ttk.Combobox(master=self.filterFrame, values = self.windows, state="readonly")
         self.uiElements.append(self.windowSelect)
         self.uiGridParams.append([4, 1, 1, 1, "WE"])
-        self.windowSelect.bind("<<ComboboxSelected>>", self.handle_updateProp4)
+        self.windowSelect.bind("<<ComboboxSelected>>", self.handle_updateWindow)
         self.windowSelect.set(str(self.prop4Value[self.filterIndex]))
+        # Initialize model state
+        self.showModel = StringVar()
+        self.showModel.set("Disabled")
+        # Create label for the model selector
+        self.showModelLabel = Label(master=self.filterFrame, text="Show model")
+        self.uiElements.append(self.showModelLabel)
+        self.uiGridParams.append([5, 0, 1, 1, "E"])
+        # Create frame for the model selector
+        self.modelFrame = Frame(master=self.filterFrame)
+        self.uiElements.append(self.modelFrame)
+        self.uiGridParams.append([5, 1, 1, 2, "NESW"])
+        # Create model selector buttons
+        self.modelDisButton = Radiobutton(self.modelFrame, text="Disabled", variable = self.showModel, value = "Disabled")
+        self.uiElements.append(self.modelDisButton)
+        self.uiGridParams.append([0, 0, 1, 1, "E"])
+        self.modelDisButton.bind("<Button-1>", self.handle_modelDis)
+        self.modelEnButton = Radiobutton(self.modelFrame, text="Enabled", variable = self.showModel, value = "Enabled")
+        self.uiElements.append(self.modelEnButton)
+        self.uiGridParams.append([0, 1, 1, 1, "W"])
+        self.modelEnButton.bind("<Button-1>", self.handle_modelEn)
         
         
         
@@ -657,11 +694,9 @@ class SpectralGUI:
         self.freqs1 = int(np.ceil((self.dataSize+1)/2))
         self.freqs2 = int(np.ceil((self.dataSize+1)/2))
         # Default indices of the amplitude response to norm on
-        self.normIndexDefault1 = [0, 0, 0, self.freqs1-2, -1, 0, 0, self.freqs1-2, 0, 0, None]
-        self.normIndexDefault2 = [0, 0, 0, self.freqs2-2, -1, 0, 0, self.freqs2-2, 0, 0, None]
+        self.normIndexDefault = [0, 0, 0, self.freqs1-2, -1, 0, 0, self.freqs1-2, 0, 0, None]
         # Index of the amplitude response to norm on
-        self.normIndex1 = self.normIndexDefault1
-        self.normIndex2 = self.normIndexDefault2
+        self.normIndex = self.normIndexDefault
         # Create values for frequency axis
         self.f1 = np.linspace(0, fMax, self.freqs1)
         self.f2 = np.linspace(0, fMax, self.freqs2)
@@ -702,8 +737,8 @@ class SpectralGUI:
 		    arrowprops=dict(arrowstyle='->')
 		)
         self.maxAnnotation2.set_visible(False)
-        # Potentially create phases
-        #if self.showPhase.get() == "Enabled":
+        # Create modelled transfer function
+        self.transferModel, = self.ax2.plot(self.f1, self.S1Pre, "g.-", label="Modelled transfer function", linewidth=0.5)
         # Create arrays to hold current phases (pre averaging)
         self.phase1Pre = [0] * self.freqs1
         self.phase2Pre = [0] * self.freqs2
@@ -717,6 +752,8 @@ class SpectralGUI:
         # Create phases
         self.phase1, = self.ax3.plot(self.f1, self.phase1Pre, "b.", label=self.windows[0] + " window phase", markersize=1)
         self.phase2, = self.ax3.plot(self.f2, self.phase2Pre, "r.", label=self.windows[0] + " window phase", markersize=1)
+        # Create modelled phase
+        self.phaseModel, = self.ax3.plot(self.f1, self.phase1Pre, "g.", label="Modelled phase", markersize=1)
         # Start and end frequencies for the signal power integrator
         self.startF = 0
         self.endF = fMax
@@ -841,6 +878,8 @@ class SpectralGUI:
         self.handle_updateWindow2()
         # Initially hide phases
         self.handle_phaseDis()
+        # Initially hide model
+        self.handle_modelDis()
         # Display the widgets
         L.buildUI(self.uiElements, self.uiGridParams)
         # Display correct filter parameters
@@ -911,15 +950,12 @@ class SpectralGUI:
             time.sleep(0.1)
             if self.mode == "AD4020 spectral analysis":
                 self.ax1.set_ylabel("Voltage AD4020 (V)")
-                self.freqEntry["state"] = NORMAL
                 self.spectral = True
             elif self.mode == "LTC2500 spectral analysis":
                 self.ax1.set_ylabel("Voltage LTC2500 (V)")
-                self.freqEntry["state"] = NORMAL
                 self.spectral = True
             elif self.mode == "Internal ADC spectral analysis":
                 self.ax1.set_ylabel("Voltage Internal ADC (V)")
-                self.freqEntry["state"] = NORMAL
                 self.spectral = True
             elif (self.mode == "Pulse response & signal processing" or
                 self.mode == "Step up response & signal processing" or
@@ -928,6 +964,12 @@ class SpectralGUI:
                 self.samplerateV.set(self.procV.get())
                 self.handle_updateFreq()
                 self.freqEntry["state"] = DISABLED
+                self.windowSelect1.set("Rectangle")
+                self.handle_updateWindow1()
+                self.windowSelect1["state"] = DISABLED
+                self.windowSelect2["state"] = DISABLED
+                self.modelDisButton["state"] = NORMAL
+                self.modelEnButton["state"] = NORMAL
                 self.spectral = False
                 self.unitSelect.set("Normalized Spectrum")
                 self.handle_updateUnit()
@@ -938,13 +980,21 @@ class SpectralGUI:
                 self.legendImpulse.set_visible(True)
             # Possibly hide impulse response legend
             if self.spectral:
+                self.freqEntry["state"] = NORMAL
+                self.windowSelect1["state"] = NORMAL
+                self.windowSelect2["state"] = NORMAL
+                self.modelDisButton["state"] = DISABLED
+                self.modelEnButton["state"] = DISABLED
                 self.legendImpulse.set_visible(False)
+            #L.pln("Updating mode to " + str(self.mode))
             self.port.writeL('set mode ' + str(self.mode))
+            #L.pln("Mode updated")
             self.port.clearBuffer()
             self.readNext = True
             self.updateAxes()
             # Reactivate reading if paused by this function
             self.reading = react
+            L.pln("Reactivating: " + str(react))
             if react:
                 self.window.after(0, self.readDisp)
             # resign from power
@@ -1153,11 +1203,10 @@ class SpectralGUI:
         self.S2Pre = rezero2
         self.spectrum1.set_ydata(self.S1Pre)
         self.spectrum2.set_ydata(self.S2Pre)
-        if self.showPhase.get() == "Enabled":
-            self.phase1Pre = rezero1
-            self.phase2Pre = rezero2
-            self.phase1.set_ydata(self.phase1Pre)
-            self.phase2.set_ydata(self.phase2Pre)
+        self.phase1Pre = rezero1
+        self.phase2Pre = rezero2
+        self.phase1.set_ydata(self.phase1Pre)
+        self.phase2.set_ydata(self.phase2Pre)
     
     # Updates the x axes for plots
     def updateAxes(self):
@@ -1182,9 +1231,14 @@ class SpectralGUI:
         self.voltage.set_xdata(self.x)
         self.spectrum1.set_xdata(self.f1)
         self.spectrum2.set_xdata(self.f2)
-        if self.showPhase.get() == "Enabled":
-            self.phase1.set_xdata(self.f1)
-            self.phase2.set_xdata(self.f2)
+        self.phase1.set_xdata(self.f1)
+        self.phase2.set_xdata(self.f2)
+        if self.spectral:
+            self.transferModel.set_xdata(self.f1[1:len(self.f1)])
+            self.phaseModel.set_xdata(self.f1[1:len(self.f1)])
+        else:
+            self.transferModel.set_xdata(self.f1)
+            self.phaseModel.set_xdata(self.f1)
         self.voltage.set_ydata(self.data)
         self.resetYSpectra()
         # Update power integrator indices
@@ -1196,257 +1250,13 @@ class SpectralGUI:
         self.ax2.set_xlim([0, fMax])
         if self.showPhase.get() == "Enabled":
             self.ax3.set_xlim([0, fMax])
+        # Redraw the model
+        self.drawModelCurve()
         # Update the canvases
         L.updateCanvas(self.fig1.canvas, self.ax1, False, True)
         L.updateCanvas(self.fig2.canvas, self.ax2, False, True)
         if self.showPhase.get() == "Enabled":
-            L.updateCanvas(self.fig2.canvas, self.ax3, False, True, True)
-    
-    # Event handler for signal filter selector
-    def handle_updateFilter(self, event=0, recursive=False, recReact=False, val=None):
-        newFilter = self.filterSelect.get()
-        if val != None:
-            newFilter = val
-        # Stop reading during update
-        react = self.reading
-        if recursive:
-            react = recReact
-        self.reading = False
-        if self.busy:
-            self.window.after(1, lambda: self.handle_updateFilter(recursive=True, recReact=react, val=newFilter))
-        else:
-            # Seize Power
-            self.busy = True
-            self.prop1Label.grid_forget()
-            self.prop1Entry.grid_forget()
-            self.prop2Label.grid_forget()
-            self.prop2Entry.grid_forget()
-            self.prop3Label.grid_forget()
-            self.prop3Entry.grid_forget()
-            self.prop4Label.grid_forget()
-            self.windowSelect.grid_forget()
-            for k in range(len(self.filters)):
-                if newFilter == self.filters[k]:
-                    self.filterIndex = k
-                    self.prop1Label.configure(text=self.prop1Names[k])
-                    self.prop2Label.configure(text=self.prop2Names[k])
-                    self.prop3Label.configure(text=self.prop3Names[k])
-                    self.prop4Label.configure(text=self.prop4Names[k])
-                    if self.prop1Visible[k]:
-                        self.prop1Label.grid(row=1, column=0, sticky="E")
-                        self.prop1Entry.grid(row=1, column=1, sticky="WE")
-                    else:
-                        pass
-                    if self.prop2Visible[k]:
-                        self.prop2Label.grid(row=2, column=0, sticky="E")
-                        self.prop2Entry.grid(row=2, column=1, sticky="WE")
-                    else:
-                        pass
-                    if self.prop3Visible[k]:
-                        self.prop3Label.grid(row=3, column=0, sticky="E")
-                        self.prop3Entry.grid(row=3, column=1, sticky="WE")
-                    else:
-                        pass
-                    if self.prop4Visible[k]:
-                        self.prop4Label.grid(row=4, column=0, sticky="E")
-                        self.windowSelect.grid(row=4, column=1, sticky="WE")
-                    self.prop1V.set(self.prop1Value[k])
-                    self.prop2V.set(self.prop2Value[k])
-                    self.prop3V.set(self.prop3Value[k])
-                    self.windowSelect.set(str(self.prop4Value[k]))
-            self.port.writeL("set filter " + newFilter)
-            self.resetYSpectra()
-            # Clear the buffer
-            self.port.clearBuffer()
-            self.readNext = True
-            # resign from power
-            self.busy = False
-            # Update all filter properties
-            time.sleep(0.005)
-            self.handle_updateProp1()
-            time.sleep(0.005)
-            self.handle_updateProp2()
-            time.sleep(0.005)
-            self.handle_updateProp3()
-            time.sleep(0.005)
-            self.handle_updateProp4()
-    
-    # Event handler for filter property 1 entry box
-    def handle_updateProp1(self, event=0, recursive=False, recReact=False, val=None):
-        # Make sure the input has the correct type
-        newProp = self.prop1Value[self.filterIndex]
-        if self.prop1Type[self.filterIndex] == "Integer":
-            try:
-                newProp = int(self.prop1V.get())
-            except ValueError:
-                pass
-        elif self.prop1Type[self.filterIndex] == "Float":
-            try:
-                newProp = float(self.prop1V.get())
-            except ValueError:
-                pass
-        else:
-            return
-        if val != None:
-            newProp = val
-        # Make sure the input is in the input range
-        if newProp < self.prop1Min[self.filterIndex]:
-            newProp = self.prop1Min[self.filterIndex]
-        if newProp > self.prop1Max[self.filterIndex]:
-            newProp = self.prop1Max[self.filterIndex]
-        # Stop reading during update
-        react = self.reading
-        if recursive:
-            react = recReact
-        self.reading = False
-        if self.busy:
-            self.window.after(1, lambda: self.handle_updateProp1(recursive=True, recReact=react))
-        else:
-            # Make sure the input has the correct type
-            newProp = self.prop1Value[self.filterIndex]
-            if self.prop1Type[self.filterIndex] == "Integer":
-                try:
-                    newProp = int(self.prop1V.get())
-                except ValueError:
-                    pass
-            elif self.prop1Type[self.filterIndex] == "Float":
-                try:
-                    newProp = float(self.prop1V.get())
-                except ValueError:
-                    pass
-            else:
-                return
-            # Make sure the input is in the input range
-            if newProp < self.prop1Min[self.filterIndex]:
-                newProp = self.prop1Min[self.filterIndex]
-            if newProp > self.prop1Max[self.filterIndex]:
-                newProp = self.prop1Max[self.filterIndex]
-            # Update variable for filter property 1
-            self.prop1Value[self.filterIndex] = newProp
-            self.prop1V.set(str(self.prop1Value[self.filterIndex]))
-            # Write command to serial port
-            self.port.writeL("set filterProperty1 " + str(self.prop1Value[self.filterIndex]))
-            #self.drawModelCurve()
-            # Update the axes
-            self.updateAxes()
-            # Clear the buffer
-            self.port.clearBuffer()
-            # Reactivate reading if paused by this function
-            self.reading = react
-            if react:
-                self.window.after(0, self.readDisp)
-    
-    # Event handler for filter property 2 entry box
-    def handle_updateProp2(self, event=0, recursive=False, recReact=False):
-        # Stop reading during update
-        react = self.reading
-        if recursive:
-            react = recReact
-        self.reading = False
-        if self.busy:
-            self.window.after(1, lambda: self.handle_updateProp2(recursive=True, recReact=react))
-        else:
-            # Make sure the input has the correct type
-            newProp = self.prop2Value[self.filterIndex]
-            if self.prop2Type[self.filterIndex] == "Integer":
-                try:
-                    newProp = int(self.prop2V.get())
-                except ValueError:
-                    pass
-            elif self.prop2Type[self.filterIndex] == "Float":
-                try:
-                    newProp = float(self.prop2V.get())
-                except ValueError:
-                    pass
-            else:
-                return
-            # Make sure the input is in the input range
-            if newProp < self.prop2Min[self.filterIndex]:
-                newProp = self.prop2Min[self.filterIndex]
-            if newProp > self.prop2Max[self.filterIndex]:
-                newProp = self.prop2Max[self.filterIndex]
-            # Update variable for filter property 2
-            self.prop2Value[self.filterIndex] = newProp
-            self.prop2V.set(str(self.prop2Value[self.filterIndex]))
-            # Write command to serial port
-            self.port.writeL("set filterProperty2 " + str(self.prop2Value[self.filterIndex]))
-            #self.drawModelCurve()
-            # Update the axes
-            self.updateAxes()
-            # Clear the buffer
-            self.port.clearBuffer()
-            # Reactivate reading if paused by this function
-            self.reading = react
-            if react:
-                self.window.after(0, self.readDisp)
-    
-    # Event handler for filter property 3 entry box
-    def handle_updateProp3(self, event=0, recursive=False, recReact=False):
-        # Stop reading during update
-        react = self.reading
-        if recursive:
-            react = recReact
-        self.reading = False
-        if self.busy:
-            self.window.after(1, lambda: self.handle_updateProp3(recursive=True, recReact=react))
-        else:
-            # Make sure the input has the correct type
-            newProp = self.prop3Value[self.filterIndex]
-            if self.prop3Type[self.filterIndex] == "Integer":
-                try:
-                    newProp = int(self.prop3V.get())
-                except ValueError:
-                    pass
-            elif self.prop3Type[self.filterIndex] == "Float":
-                try:
-                    newProp = float(self.prop3V.get())
-                except ValueError:
-                    pass
-            else:
-                return
-            # Make sure the input is in the input range
-            if newProp < self.prop3Min[self.filterIndex]:
-                newProp = self.prop3Min[self.filterIndex]
-            if newProp > self.prop3Max[self.filterIndex]:
-                newProp = self.prop3Max[self.filterIndex]
-            # Update variable for filter property 3
-            self.prop3Value[self.filterIndex] = newProp
-            self.prop3V.set(str(self.prop3Value[self.filterIndex]))
-            # Write command to serial port
-            self.port.writeL("set filterProperty3 " + str(self.prop3Value[self.filterIndex]))
-            #self.drawModelCurve()
-            # Update the axes
-            self.updateAxes()
-            # Clear the buffer
-            self.port.clearBuffer()
-            # Reactivate reading if paused by this function
-            self.reading = react
-            if react:
-                self.window.after(0, self.readDisp)
-    
-    # Event handler for filter property 4 combo box
-    def handle_updateProp4(self, event=0, recursive=False, recReact=False):
-        # Stop reading during update
-        react = self.reading
-        if recursive:
-            react = recReact
-        self.reading = False
-        if self.busy:
-            self.window.after(1, lambda: self.handle_updateProp4(recursive=True, recReact=react))
-        else:
-            # Update variable for filter property 1
-            self.prop4Value[self.filterIndex] = self.windowSelect.get()
-            # Write command to serial port
-            self.port.writeL("set filterProperty4 " + self.windowSelect.get())
-            #self.drawModelCurve()
-            # Update the axes
-            self.updateAxes()
-            # Clear the buffer
-            self.port.clearBuffer()
-            # Reactivate reading if paused by this function
-            self.reading = react
-            if react:
-                self.window.after(0, self.readDisp)
+            L.updateCanvas(self.fig2.canvas, self.ax3, False, True)
     
     # Callback function for changing the y-scale to "Logarithmic"
     def handle_logScale(self, event):
@@ -1510,8 +1320,8 @@ class SpectralGUI:
             S1 = np.divide(self.S1Pre, self.averaged)
             S2 = np.divide(self.S2Pre, self.averaged)
         elif self.unitSelect.get() == "Normalized Spectrum":
-            S1 = np.divide(self.S1Pre, self.S1Pre[self.normIndex1[self.filterIndex]])
-            S2 = np.divide(self.S2Pre, self.S2Pre[self.normIndex2[self.filterIndex]])
+            S1 = np.divide(self.S1Pre, self.S1Pre[self.normIndex[self.filterIndex]])
+            S2 = np.divide(self.S2Pre, self.S2Pre[self.normIndex[self.filterIndex]])
         self.spectrum1.set_ydata(S1)
         self.spectrum2.set_ydata(S2)
         self.dots.set_ydata([S1[self.startFindex], S1[self.endFindex]])
@@ -1536,41 +1346,25 @@ class SpectralGUI:
         self.port.clearBuffer()
         self.readNext = True
     
-    # Callback function for changing the subtraction to "Disabled"
+    # Callback function for changing the phase to "Disabled"
     def handle_phaseDis(self, event=0):
         self.showPhase.set("Disabled")
         # Hide phases
         self.phase1.set_visible(False)
         self.phase2.set_visible(False)
+        self.phaseModel.set_visible(False)
         self.ax3.set_visible(False)
-        # Update the axes
-        self.updateAxes()
-        # Clear serial buffer
-        self.port.clearBuffer()
-        self.readNext = True
     
-    # Callback function for changing the subtraction to "Enabled"
+    # Callback function for changing the phase to "Enabled"
     def handle_phaseEn(self, event):
         self.showPhase.set("Enabled")
-        # Create arrays to hold current phases (pre averaging)
-        self.phase1Pre = [0] * self.freqs1
-        self.phase2Pre = [0] * self.freqs2
-        # Create axis for phase
-        #self.ax3 = self.ax2.twinx()
-        #self.ax3.set_ylabel('Phase')
         # Display phases
         if self.window1.get() != "Disabled":
             self.phase1.set_visible(True)
         if self.window2.get() != "Disabled":
             self.phase2.set_visible(True)
         self.ax3.set_visible(True)
-        #self.phase1, = self.ax3.plot(self.f1, [0] * (self.freqs1), "b.", label=self.windows[0] + " window phase", markersize=1)
-        #self.phase2, = self.ax3.plot(self.f2, [0] * (self.freqs2), "r.", label=self.windows[0] + " window phase", markersize=1)
-        # Update the axes
-        self.updateAxes()
-        # Clear serial buffer
-        self.port.clearBuffer()
-        self.readNext = True
+        self.drawModelCurve()
     
     # Event handler for transform size entry box
     def handle_updateTransformSize1(self, event=0):
@@ -1642,6 +1436,436 @@ class SpectralGUI:
         self.transformSize2Entry["state"] = DISABLED
         self.transformSizeStatus.set("N_FT-1=N/2")
         self.handle_updateSize(force=True)
+    
+    # Event handler for signal filter selector
+    def handle_updateFilter(self, event=0, recursive=False, recReact=False, val=None):
+        newFilter = self.filterSelect.get()
+        if val != None:
+            newFilter = val
+        # Stop reading during update
+        react = self.reading
+        if recursive:
+            react = recReact
+        self.reading = False
+        if self.busy:
+            self.window.after(1, lambda: self.handle_updateFilter(recursive=True, recReact=react, val=newFilter))
+        else:
+            # Seize Power
+            self.busy = True
+            self.prop1Label.grid_forget()
+            self.prop1Entry.grid_forget()
+            self.prop2Label.grid_forget()
+            self.prop2Entry.grid_forget()
+            self.prop3Label.grid_forget()
+            self.prop3Entry.grid_forget()
+            self.prop4Label.grid_forget()
+            self.windowSelect.grid_forget()
+            for k in range(len(self.filters)):
+                if newFilter == self.filters[k]:
+                    self.filterIndex = k
+                    self.prop1Label.configure(text=self.prop1Names[k])
+                    self.prop2Label.configure(text=self.prop2Names[k])
+                    self.prop3Label.configure(text=self.prop3Names[k])
+                    self.prop4Label.configure(text=self.prop4Names[k])
+                    if self.prop1Visible[k]:
+                        self.prop1Label.grid(row=1, column=0, sticky="E")
+                        self.prop1Entry.grid(row=1, column=1, sticky="WE")
+                    else:
+                        pass
+                    if self.prop2Visible[k]:
+                        self.prop2Label.grid(row=2, column=0, sticky="E")
+                        self.prop2Entry.grid(row=2, column=1, sticky="WE")
+                    else:
+                        pass
+                    if self.prop3Visible[k]:
+                        self.prop3Label.grid(row=3, column=0, sticky="E")
+                        self.prop3Entry.grid(row=3, column=1, sticky="WE")
+                    else:
+                        pass
+                    if self.prop4Visible[k]:
+                        self.prop4Label.grid(row=4, column=0, sticky="E")
+                        self.windowSelect.grid(row=4, column=1, sticky="WE")
+                    self.prop1V.set(self.prop1Value[k])
+                    self.prop2V.set(self.prop2Value[k])
+                    self.prop3V.set(self.prop3Value[k])
+                    self.windowSelect.set(str(self.prop4Value[k]))
+            self.port.writeL("set filter " + newFilter)
+            self.resetYSpectra()
+            # Clear the buffer
+            self.port.clearBuffer()
+            self.readNext = True
+            # Reactivate reading if paused by this function
+            self.reading = react
+            if react:
+                self.window.after(0, self.readDisp)
+            # resign from power
+            self.busy = False
+            # Update all filter properties
+            time.sleep(0.005)
+            self.handle_updateProp1(force=True)
+            time.sleep(0.005)
+            self.handle_updateProp2(force=True)
+            time.sleep(0.005)
+            self.handle_updateProp3(force=True)
+            time.sleep(0.005)
+            self.handle_updateProp4(force=True)
+    
+    # Event handler for filter property 1 entry box
+    def handle_updateProp1(self, event=0, force=False, recursive=False, recReact=False, val=None):
+        # Make sure the input has the correct type
+        newProp = self.prop1Value[self.filterIndex]
+        if self.prop1Type[self.filterIndex] == "Integer":
+            try:
+                newProp = int(self.prop1V.get())
+            except ValueError:
+                pass
+        elif self.prop1Type[self.filterIndex] == "Float":
+            try:
+                newProp = float(self.prop1V.get())
+            except ValueError:
+                pass
+        elif self.prop1Type[self.filterIndex] == "String":
+            newProp = self.prop1V.get()
+        else:
+            return
+        if val != None:
+            newProp = val
+        if self.prop1Type[self.filterIndex] != "String":
+            # Make sure the input is in the input range
+            if newProp < self.prop1Min[self.filterIndex]:
+                newProp = self.prop1Min[self.filterIndex]
+            if newProp > self.prop1Max[self.filterIndex]:
+                newProp = self.prop1Max[self.filterIndex]
+        # Only update if the value has actually changed
+        if newProp != self.prop1Value[self.filterIndex] or force:
+            # Stop reading during update
+            react = self.reading
+            if recursive:
+                react = recReact
+            self.reading = False
+            if self.busy:
+                self.window.after(1, lambda: self.handle_updateProp1(force=force, recursive=True, recReact=react, val=newProp))
+            else:
+                # Seize Power
+                self.busy = True
+                # Update variable for filter property 1
+                self.prop1Value[self.filterIndex] = newProp
+                # Write command to serial port
+                self.port.writeL("set filterProperty1 " + str(self.prop1Value[self.filterIndex]))
+                self.drawModelCurve()
+                # Update the axes
+                self.updateAxes()
+                # Clear the buffer
+                self.port.clearBuffer()
+                self.readNext = True
+                # Reactivate reading if paused by this function
+                self.reading = react
+                if react:
+                    self.window.after(0, self.readDisp)
+                # resign from power
+                self.busy = False
+        self.prop1V.set(str(self.prop1Value[self.filterIndex]))
+        self.window.update_idletasks()
+    
+    # Event handler for filter property 2 entry box
+    def handle_updateProp2(self, event=0, force=False, recursive=False, recReact=False, val=None):
+        # Make sure the input has the correct type
+        newProp = self.prop2Value[self.filterIndex]
+        if self.prop2Type[self.filterIndex] == "Integer":
+            try:
+                newProp = int(self.prop2V.get())
+            except ValueError:
+                pass
+        elif self.prop2Type[self.filterIndex] == "Float":
+            try:
+                newProp = float(self.prop2V.get())
+            except ValueError:
+                pass
+        elif self.prop2Type[self.filterIndex] == "String":
+            newProp = self.prop2V.get()
+        else:
+            return
+        if val != None:
+            newProp = val
+        if self.prop2Type[self.filterIndex] != "String":
+            # Make sure the input is in the input range
+            if newProp < self.prop2Min[self.filterIndex]:
+                newProp = self.prop2Min[self.filterIndex]
+            if newProp > self.prop2Max[self.filterIndex]:
+                newProp = self.prop2Max[self.filterIndex]
+        # Only update if the value has actually changed
+        if newProp != self.prop2Value[self.filterIndex] or force:
+            # Stop reading during update
+            react = self.reading
+            if recursive:
+                react = recReact
+            self.reading = False
+            if self.busy:
+                self.window.after(1, lambda: self.handle_updateProp2(force=force, recursive=True, recReact=react, val=newProp))
+            else:
+                # Seize Power
+                self.busy = True
+                # Update variable for filter property 2
+                self.prop2Value[self.filterIndex] = newProp
+                # Write command to serial port
+                self.port.writeL("set filterProperty2 " + str(self.prop2Value[self.filterIndex]))
+                self.drawModelCurve()
+                # Update the axes
+                self.updateAxes()
+                # Clear the buffer
+                self.port.clearBuffer()
+                self.readNext = True
+                # Reactivate reading if paused by this function
+                self.reading = react
+                if react:
+                    self.window.after(0, self.readDisp)
+                # resign from power
+                self.busy = False
+        self.prop2V.set(str(self.prop2Value[self.filterIndex]))
+        self.window.update_idletasks()
+    
+    # Event handler for filter property 3 entry box
+    def handle_updateProp3(self, event=0, force=False, recursive=False, recReact=False, val=None):
+        # Make sure the input has the correct type
+        newProp = self.prop3Value[self.filterIndex]
+        if self.prop3Type[self.filterIndex] == "Integer":
+            try:
+                newProp = int(self.prop3V.get())
+            except ValueError:
+                pass
+        elif self.prop3Type[self.filterIndex] == "Float":
+            try:
+                newProp = float(self.prop3V.get())
+            except ValueError:
+                pass
+        elif self.prop3Type[self.filterIndex] == "String":
+            newProp = self.prop3V.get()
+        else:
+            return
+        if val != None:
+            newProp = val
+        if self.prop3Type[self.filterIndex] != "String":
+            # Make sure the input is in the input range
+            if newProp < self.prop3Min[self.filterIndex]:
+                newProp = self.prop3Min[self.filterIndex]
+            if newProp > self.prop3Max[self.filterIndex]:
+                newProp = self.prop3Max[self.filterIndex]
+        # Only update if the value has actually changed
+        if newProp != self.prop3Value[self.filterIndex] or force:
+            # Stop reading during update
+            react = self.reading
+            if recursive:
+                react = recReact
+            self.reading = False
+            if self.busy:
+                self.window.after(1, lambda: self.handle_updateProp3(force=force, recursive=True, recReact=react, val=newProp))
+            else:
+                # Seize Power
+                self.busy = True
+                # Update variable for filter property 3
+                self.prop3Value[self.filterIndex] = newProp
+                # Write command to serial port
+                self.port.writeL("set filterProperty3 " + str(self.prop3Value[self.filterIndex]))
+                self.drawModelCurve()
+                # Update the axes
+                self.updateAxes()
+                # Clear the buffer
+                self.port.clearBuffer()
+                self.readNext = True
+                # Reactivate reading if paused by this function
+                self.reading = react
+                if react:
+                    self.window.after(0, self.readDisp)
+                # resign from power
+                self.busy = False
+        self.prop3V.set(str(self.prop3Value[self.filterIndex]))
+        self.window.update_idletasks()
+    
+    # Event handler for filter property 4 selector
+    def handle_updateWindow(self, event):
+        self.prop4V.set(self.windowSelect.get())
+        self.handle_updateProp4()
+    
+    # Update function for filter property 4
+    def handle_updateProp4(self, force=False, recursive=False, recReact=False, val=None):
+        # Make sure the input has the correct type
+        newProp = self.prop4Value[self.filterIndex]
+        if self.prop4Type[self.filterIndex] == "Integer":
+            try:
+                newProp = int(self.prop4V.get())
+            except ValueError:
+                pass
+        elif self.prop4Type[self.filterIndex] == "Float":
+            try:
+                newProp = float(self.prop4V.get())
+            except ValueError:
+                pass
+        elif self.prop4Type[self.filterIndex] == "String":
+            newProp = self.prop4V.get()
+        else:
+            return
+        if val != None:
+            newProp = val
+        if self.prop4Type[self.filterIndex] != "String":
+            # Make sure the input is in the input range
+            if newProp < self.prop4Min[self.filterIndex]:
+                newProp = self.prop4Min[self.filterIndex]
+            if newProp > self.prop4Max[self.filterIndex]:
+                newProp = self.prop4Max[self.filterIndex]
+        # Only update if the value has actually changed
+        if newProp != self.prop4Value[self.filterIndex] or force:
+            # Stop reading during update
+            react = self.reading
+            if recursive:
+                react = recReact
+            self.reading = False
+            if self.busy:
+                self.window.after(1, lambda: self.handle_updateProp4(force=force, recursive=True, recReact=react, val=newProp))
+            else:
+                # Seize Power
+                self.busy = True
+                # Update variable for filter property 4
+                self.prop4Value[self.filterIndex] = newProp
+                # Write command to serial port
+                self.port.writeL("set filterProperty4 " + str(self.prop4Value[self.filterIndex]))
+                self.drawModelCurve()
+                # Update the axes
+                self.updateAxes()
+                # Clear the buffer
+                self.port.clearBuffer()
+                self.readNext = True
+                # Reactivate reading if paused by this function
+                self.reading = react
+                if react:
+                    self.window.after(0, self.readDisp)
+                # resign from power
+                self.busy = False
+        self.prop4V.set(str(self.prop4Value[self.filterIndex]))
+        self.window.update_idletasks()
+    
+    # Callback function for changing the model to "Disabled"
+    def handle_modelDis(self, event=0):
+        self.showModel.set("Disabled")
+        # Hide models
+        self.transferModel.set_visible(False)
+        self.phaseModel.set_visible(False)
+        # Update the canvas
+        self.window.update_idletasks()
+        L.updateCanvas(self.fig2.canvas, self.ax2, False, True)
+        self.window.update_idletasks()
+    
+    # Callback function for changing the model to "Enabled"
+    def handle_modelEn(self, event):
+        self.showModel.set("Enabled")
+        # Display models
+        self.transferModel.set_visible(True)
+        if self.showPhase.get() != "Disabled":
+            self.phaseModel.set_visible(True)
+    
+    # Function to draw the modelled transfer function and phase
+    def drawModelCurve(self):
+        if self.filterSelect.get() == "Scaling":
+            self.transferModel.set_ydata([1] * (self.freqs1 - 1))
+            phases = np.linspace(0, -2*np.pi, self.freqs1)
+            phases = phases[1:len(phases)]
+            self.phaseModel.set_ydata(phases)
+        elif self.filterSelect.get() == "Moving average":
+            #omegaH = np.multiply(self.transferModel.get_xdata(), 2*np.pi/self.proc)
+            #hma = np.multiply(np.sin(np.multiply(omegaH, self.prop1Value[1]/2)), np.divide(1/self.prop1Value[1], np.sin(np.divide(omegaH, 2))))
+            hma = np.divide(np.subtract(np.exp(np.multiply(np.multiply(1j, 2*np.pi*self.prop1Value[self.filterIndex]/self.proc), self.f1)), 1), 
+                            np.subtract(np.exp(np.multiply(np.multiply(1j, 2*np.pi/self.proc), self.f1)), 1))
+            hma = np.divide(hma, np.abs(hma[self.normIndex[self.filterIndex]]))
+            self.transferModel.set_ydata(np.abs(hma))
+            self.phaseModel.set_ydata(np.angle(hma))
+            # Hier ist die Phase falsch
+        elif self.filterSelect.get() == "Low pass filter 1st order":
+            # Catch case of f_c=0
+            if self.prop1Value[self.filterIndex] == 0:
+                self.transferModel.set_visible(False)
+                self.phaseModel.set_visible(False)
+                return
+            #hlpf = np.divide(self.prop1Value[self.filterIndex], np.sqrt(np.add(np.power(self.transferModel.get_xdata(), 2), pow(self.prop1Value[self.filterIndex], 2))))
+            hlpf = np.divide(1, np.add(1, np.multiply(1j/self.prop1Value[self.filterIndex], self.f1)))
+            hlpf = np.divide(hlpf, np.abs(hlpf[self.normIndex[self.filterIndex]]))
+            self.transferModel.set_ydata(abs(hlpf))
+            self.phaseModel.set_ydata(np.angle(hlpf))
+        elif self.filterSelect.get() == "High pass filter 1st order":
+            # Hier warte ich noch auf die korrekte komplexe Formel
+            hlpf = np.power(np.divide(pow(self.prop1Value[self.filterIndex], 2), np.add(np.power(self.transferModel.get_xdata(), 2), pow(self.prop1Value[self.filterIndex], 2))), 1/2)
+            self.transferModel.set_ydata(np.divide(hlpf, hlpf[self.normIndex[self.filterIndex]]))
+        elif self.filterSelect.get() == "FIR bandpass filter":
+            nFilter = self.prop3Value[self.filterIndex]
+            k = np.linspace(-nFilter/2, nFilter/2, nFilter+1)
+            phi1 = 2*np.pi*self.prop1Value[self.filterIndex] / self.proc
+            phi2 = 2*np.pi*self.prop2Value[self.filterIndex] / self.proc
+            hres = np.divide((np.sin(np.multiply(phi2, k)) - np.sin(np.multiply(phi1, k))), np.multiply(np.pi, k))
+            hres[int((len(hres)-1) / 2)] = (phi2-phi1) / np.pi
+            self.prop1Value[self.filterIndex]
+            self.normIndex[self.filterIndex] = int((self.prop1Value[self.filterIndex] + self.prop2Value[self.filterIndex]) * 
+                                                    len(self.transferModel.get_xdata()) / self.proc)
+            Hzf = np.fft.fft(hres, n=2*len(self.transferModel.get_xdata()))
+            Hzf = Hzf[1:int(len(Hzf)/2)+1]
+            self.transferModel.set_ydata(np.divide(abs(Hzf), abs(Hzf)[self.normIndex[self.filterIndex]]))
+            self.phaseModel.set_ydata(np.angle(Hzf))
+        elif self.filterSelect.get() == "FIR bandstop filter":
+            nFilter = self.prop3Value[self.filterIndex]
+            k = np.linspace(-nFilter/2, nFilter/2, nFilter+1)
+            phi1 = 2*np.pi*self.prop1Value[self.filterIndex] / self.proc
+            phi2 = 2*np.pi*self.prop2Value[self.filterIndex] / self.proc
+            hres = -np.divide((np.sin(np.multiply(phi2, k)) - np.sin(np.multiply(phi1, k))), np.multiply(np.pi, k))
+            hres[int((len(hres)-1) / 2)] = 1 - (phi2-phi1) / np.pi
+            Hzf = np.fft.fft(hres, n=2*len(self.transferModel.get_xdata()))
+            Hzf = Hzf[1:int(len(Hzf)/2)+1]
+            self.transferModel.set_ydata(np.divide(abs(Hzf), abs(Hzf)[self.normIndex[self.filterIndex]]))
+            self.phaseModel.set_ydata(np.angle(Hzf))
+        elif self.filterSelect.get() == "FIR low pass filter":
+            nFilter = self.prop3Value[self.filterIndex]
+            k = np.linspace(-nFilter/2, nFilter/2, nFilter+1)
+            phic = 2*np.pi*self.prop1Value[self.filterIndex] / self.proc
+            hres = np.divide(np.sin(np.multiply(phic, k)), np.multiply(np.pi, k))
+            hres[int((len(hres)-1) / 2)] = phic / np.pi
+            Hzf = np.fft.fft(hres, n=2*len(self.transferModel.get_xdata()))
+            Hzf = Hzf[1:int(len(Hzf)/2)+1]
+            self.transferModel.set_ydata(np.divide(abs(Hzf), abs(Hzf)[self.normIndex[self.filterIndex]]))
+            self.phaseModel.set_ydata(np.angle(Hzf))
+        elif self.filterSelect.get() == "FIR high pass filter":
+            nFilter = self.prop3Value[self.filterIndex]
+            k = np.linspace(-nFilter/2, nFilter/2, nFilter+1)
+            phic = 2*np.pi*self.prop1Value[self.filterIndex] / self.proc
+            hres = np.subtract(np.divide(np.sin(np.multiply(np.pi, k)), np.multiply(np.pi, k)), np.divide(np.sin(np.multiply(phic, k)), np.multiply(np.pi, k)))
+            hres[int((len(hres)-1) / 2)] = 1 - phic / np.pi
+            Hzf = np.fft.fft(hres, n=2*len(self.transferModel.get_xdata()))
+            Hzf = Hzf[1:int(len(Hzf)/2)+1]
+            self.transferModel.set_ydata(np.divide(abs(Hzf), abs(Hzf)[self.normIndex[self.filterIndex]]))
+            self.phaseModel.set_ydata(np.angle(Hzf))
+        elif self.filterSelect.get() == "Low pass filter 2nd order":
+            # Catch case of f_c=0
+            if self.prop1Value[self.filterIndex] == 0:
+                self.transferModel.set_visible(False)
+                self.phaseModel.set_visible(False)
+                return
+            hlpf = np.divide(1, np.power(np.add(1, np.multiply(1j/self.prop1Value[self.filterIndex], self.f1)), 2))
+            hlpf = np.divide(hlpf, np.abs(hlpf[self.normIndex[self.filterIndex]]))
+            self.transferModel.set_ydata(abs(hlpf))
+            self.phaseModel.set_ydata(np.angle(hlpf))
+        elif self.filterSelect.get() == "Low pass filter 3rd order":
+            # Catch case of f_c=0
+            if self.prop1Value[self.filterIndex] == 0:
+                self.transferModel.set_visible(False)
+                self.phaseModel.set_visible(False)
+                return
+            hlpf = np.divide(1, np.power(np.add(1, np.multiply(1j/self.prop1Value[self.filterIndex], self.f1)), 3))
+            hlpf = np.divide(hlpf, np.abs(hlpf[self.normIndex[self.filterIndex]]))
+            self.transferModel.set_ydata(abs(hlpf))
+            self.phaseModel.set_ydata(np.angle(hlpf))
+        elif self.filterSelect.get() == "Programmable IIR filter":
+            self.transferModel.set_visible(False)
+            self.phaseModel.set_visible(False)
+        if self.filterSelect.get() != "Programmable IIR filter":
+            if self.showModel.get() == "Enabled":
+                self.transferModel.set_visible(True)
+                if self.showPhase.get() == "Enabled":
+                    self.phaseModel.set_visible(True)
     
     # Function to check and possibly restore serial connection
     def checkConnection(self):
@@ -1735,17 +1959,15 @@ class SpectralGUI:
                     self.voltagePre = self.data
                 self.S1Pre += abs(X1)
                 self.S2Pre += abs(X2)
-                if self.showPhase.get() == "Enabled":
-                    self.phase1Pre += np.angle(X1)
-                    self.phase2Pre += np.angle(X2)
+                self.phase1Pre += np.angle(X1)
+                self.phase2Pre += np.angle(X2)
                 self.averaged += 1
             else:
                 self.voltagePre = self.data
                 self.S1Pre = abs(X1)
                 self.S2Pre = abs(X2)
-                if self.showPhase.get() == "Enabled":
-                    self.phase1Pre = np.angle(X1)
-                    self.phase2Pre = np.angle(X2)
+                self.phase1Pre = np.angle(X1)
+                self.phase2Pre = np.angle(X2)
                 self.averaged = 1
             # Display the values
             if not self.spectral:
@@ -1812,6 +2034,12 @@ class SpectralGUI:
                 # Add power integrator to the legend
                 self.plots += [self.dots]
                 self.plotTitles += ["Total power in selected band: " + L.fstr(power, 5) + "V$^2$"]
+            if self.transferModel.get_visible():
+                self.plots += [self.transferModel]
+                self.plotTitles += ["Modeled transfer function"]
+                if self.phaseModel.get_visible():
+                    self.plots += [self.phaseModel]
+                    self.plotTitles += ["Modeled phase"]
             # Draw the legends
             if self.showPhase.get() == "Enabled":
                 self.legendSpectra = self.ax3.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: " + L.fstr(self.averaged))
