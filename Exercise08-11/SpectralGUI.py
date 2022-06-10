@@ -17,9 +17,16 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 09.06.2022, ver1.17
+# 10.06.2022, ver1.18
 # 
 # Changelog
+#   - 10.06.2022: Changed data format for saved files from .txt to .csv,
+#                 added x-data to .csv files,
+#                 fixed a bug that caused the data of the time series to be saved instead of that of the spectra,
+#                 added keypad-return and focus-out binds to missing settings,
+#                 changed modelling transfer function to complex data for high pass 1st order filter,
+#                 fixed a bug that caused the spectra to be shifted by one frequency bin,
+#                 fixed a bug that caused the normalization index to not be updated
 #   - 09.06.2022: Changed modelling of transfer function to complex data for all filters except high pass 1st order,
 #                 added missing phase models,
 #                 changed color of models to green
@@ -165,7 +172,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.17")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.18")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -502,6 +509,8 @@ class SpectralGUI:
         self.uiElements.append(self.prop1Entry)
         self.uiGridParams.append([1, 1, 1, 1, "WE"])
         self.prop1Entry.bind("<Return>", self.handle_updateProp1)
+        self.prop1Entry.bind("<KP_Enter>", self.handle_updateProp1)
+        self.prop1Entry.bind("<FocusOut>", self.handle_updateProp1)
         # Names for the filter property 2
         self.prop2Names = ["", "", "", "", "Upper frequency", "Upper frequency", "", "", "", "", ""]
         # Visibility of filter property 2
@@ -526,6 +535,8 @@ class SpectralGUI:
         self.uiElements.append(self.prop2Entry)
         self.uiGridParams.append([2, 1, 1, 1, "WE"])
         self.prop2Entry.bind("<Return>", self.handle_updateProp2)
+        self.prop2Entry.bind("<KP_Enter>", self.handle_updateProp2)
+        self.prop2Entry.bind("<FocusOut>", self.handle_updateProp2)
 		# Names for the filter property 3
         self.prop3Names = ["", "", "", "", "Filter order", "Filter order", "Filter order", "Filter order", "", "", ""]
         # Visibility of filter property 3
@@ -550,6 +561,8 @@ class SpectralGUI:
         self.uiElements.append(self.prop3Entry)
         self.uiGridParams.append([3, 1, 1, 1, "WE"])
         self.prop3Entry.bind("<Return>", self.handle_updateProp3)
+        self.prop3Entry.bind("<KP_Enter>", self.handle_updateProp3)
+        self.prop3Entry.bind("<FocusOut>", self.handle_updateProp3)
         # Names for the filter property 4
         self.prop4Names = ["", "", "", "", "Filter Window", "Filter Window", "Filter Window", "Filter Window", "", "", ""]
         # Visibility of filter property 4
@@ -672,9 +685,12 @@ class SpectralGUI:
             path = L.savePath("Time Series", self.dir)
             # save the image
             self.fig1.savefig(path + ".svg")
-            # save the data as text
-            f = open(path + ".txt", mode = "w")
-            f.write(str(self.data))
+            # save the data as csv file
+            f = open(path + ".csv", mode = "w")
+            savedataX = str(self.voltage.get_xdata().tolist())
+            savedataY = str(self.voltage.get_ydata().tolist())
+            savedata = savedataX[1:len(savedataX)-1] + "\n" + savedataY[1:len(savedataY)-1]
+            f.write(savedata)
             f.close
             # display the saved message
             self.saveLabel1.configure(text="Saved as " + path + "!")
@@ -801,9 +817,19 @@ class SpectralGUI:
             path = L.savePath("Spectrum", self.dir)
             # save the image
             self.fig2.savefig(path + ".svg")
-            # save the data as text
-            f = open(path + ".txt", mode = "w")
-            f.write(str(self.data))
+            # save the data of spectrum 1 as csv file
+            f = open(path + "_1" + ".csv", mode = "w")
+            savedataX = str(self.spectrum1.get_xdata().tolist())
+            savedataY = str(self.spectrum1.get_ydata().tolist())
+            savedata = savedataX[1:len(savedataX)-1] + "\n" + savedataY[1:len(savedataY)-1]
+            f.write(savedata)
+            f.close
+            # save the data of spectrum 2 as csv file
+            f = open(path + "_2" + ".csv", mode = "w")
+            savedataX = str(self.spectrum2.get_xdata().tolist())
+            savedataY = str(self.spectrum2.get_ydata().tolist())
+            savedata = savedataX[1:len(savedataX)-1] + "\n" + savedataY[1:len(savedataY)-1]
+            f.write(savedata)
             f.close
             # display the saved message
             self.saveLabel2.configure(text="Saved as " + path + "!")
@@ -986,6 +1012,7 @@ class SpectralGUI:
                 self.modelDisButton["state"] = DISABLED
                 self.modelEnButton["state"] = DISABLED
                 self.legendImpulse.set_visible(False)
+                self.handle_modelDis()
             #L.pln("Updating mode to " + str(self.mode))
             self.port.writeL('set mode ' + str(self.mode))
             #L.pln("Mode updated")
@@ -994,7 +1021,7 @@ class SpectralGUI:
             self.updateAxes()
             # Reactivate reading if paused by this function
             self.reading = react
-            L.pln("Reactivating: " + str(react))
+            #L.pln("Reactivating: " + str(react))
             if react:
                 self.window.after(0, self.readDisp)
             # resign from power
@@ -1233,6 +1260,7 @@ class SpectralGUI:
         self.spectrum2.set_xdata(self.f2)
         self.phase1.set_xdata(self.f1)
         self.phase2.set_xdata(self.f2)
+        self.normIndex = [0, 0, 0, self.freqs1-2, -1, 0, 0, self.freqs1-2, 0, 0, None]
         if self.spectral:
             self.transferModel.set_xdata(self.f1[1:len(self.f1)])
             self.phaseModel.set_xdata(self.f1[1:len(self.f1)])
@@ -1770,13 +1798,11 @@ class SpectralGUI:
             phases = phases[1:len(phases)]
             self.phaseModel.set_ydata(phases)
         elif self.filterSelect.get() == "Moving average":
-            #omegaH = np.multiply(self.transferModel.get_xdata(), 2*np.pi/self.proc)
-            #hma = np.multiply(np.sin(np.multiply(omegaH, self.prop1Value[1]/2)), np.divide(1/self.prop1Value[1], np.sin(np.divide(omegaH, 2))))
             hma = np.divide(np.subtract(np.exp(np.multiply(np.multiply(1j, 2*np.pi*self.prop1Value[self.filterIndex]/self.proc), self.f1)), 1), 
                             np.subtract(np.exp(np.multiply(np.multiply(1j, 2*np.pi/self.proc), self.f1)), 1))
             hma = np.divide(hma, np.abs(hma[self.normIndex[self.filterIndex]]))
             self.transferModel.set_ydata(np.abs(hma))
-            self.phaseModel.set_ydata(np.angle(hma))
+            self.phaseModel.set_ydata(-np.angle(hma))
             # Hier ist die Phase falsch
         elif self.filterSelect.get() == "Low pass filter 1st order":
             # Catch case of f_c=0
@@ -1784,15 +1810,17 @@ class SpectralGUI:
                 self.transferModel.set_visible(False)
                 self.phaseModel.set_visible(False)
                 return
-            #hlpf = np.divide(self.prop1Value[self.filterIndex], np.sqrt(np.add(np.power(self.transferModel.get_xdata(), 2), pow(self.prop1Value[self.filterIndex], 2))))
             hlpf = np.divide(1, np.add(1, np.multiply(1j/self.prop1Value[self.filterIndex], self.f1)))
             hlpf = np.divide(hlpf, np.abs(hlpf[self.normIndex[self.filterIndex]]))
             self.transferModel.set_ydata(abs(hlpf))
             self.phaseModel.set_ydata(np.angle(hlpf))
         elif self.filterSelect.get() == "High pass filter 1st order":
             # Hier warte ich noch auf die korrekte komplexe Formel
-            hlpf = np.power(np.divide(pow(self.prop1Value[self.filterIndex], 2), np.add(np.power(self.transferModel.get_xdata(), 2), pow(self.prop1Value[self.filterIndex], 2))), 1/2)
-            self.transferModel.set_ydata(np.divide(hlpf, hlpf[self.normIndex[self.filterIndex]]))
+            #hhpf = np.power(np.divide(pow(self.prop1Value[self.filterIndex], 2), np.add(np.power(self.transferModel.get_xdata(), 2), pow(self.prop1Value[self.filterIndex], 2))), 1/2)
+            hhpf = np.divide(1, np.subtract(1, np.divide(1j*self.prop1Value[self.filterIndex], self.f1)))
+            hhpf = np.divide(hhpf, np.abs(hhpf[self.normIndex[self.filterIndex]]))
+            self.transferModel.set_ydata(abs(hhpf))
+            self.phaseModel.set_ydata(np.angle(hhpf))
         elif self.filterSelect.get() == "FIR bandpass filter":
             nFilter = self.prop3Value[self.filterIndex]
             k = np.linspace(-nFilter/2, nFilter/2, nFilter+1)
@@ -1923,6 +1951,7 @@ class SpectralGUI:
                 values = np.subtract(values, np.average(values))
             # Store the values to the data buffer
             self.data = values
+            self.data = self.data[1:len(self.data)] + [self.data[0]]
             #self.data = self.data[1:len(self.data)]
             #self.data = np.pad(self.data, (0, 1))
             # Debug test for values that are clearly out of range
@@ -1945,8 +1974,11 @@ class SpectralGUI:
             # Compute fourier transforms
             #X1 = np.multiply(np.fft.fft(x1)[0:self.freqs1], 2/self.dataSize)
             #X2 = np.multiply(np.fft.fft(x2)[0:self.freqs1], 2/self.dataSize)
-            X1 = np.multiply(np.fft.fft(x1, n=(self.transformSize1 - 1) * 2)[0:self.freqs1], 2/self.dataSize)
-            X2 = np.multiply(np.fft.fft(x2, n=(self.transformSize2 - 1) * 2)[0:self.freqs2], 2/self.dataSize)
+            X1 = np.multiply(np.fft.fft(x1, n=(self.transformSize1) * 2)[0:self.freqs1], 2/self.dataSize)
+            X2 = np.multiply(np.fft.fft(x2, n=(self.transformSize2) * 2)[0:self.freqs2], 2/self.dataSize)
+            #L.pln(abs(np.fft.fft(x1)))
+            #L.pln(abs(np.fft.fft(x1, n=(self.transformSize1 - 1) * 2)))
+            #L.pln()
             # Possibly omit zero frequency
             if not self.spectral:
                 X1 = X1[1:len(X1)]
