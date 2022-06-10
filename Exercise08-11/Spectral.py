@@ -5,9 +5,16 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 09.06.2022, ver1.17
+# 10.06.2022, ver1.18
 # 
 # Changelog
+#   - 10.06.2022: Changed data format for saved files from .txt to .csv,
+#                 added x-data to .csv files,
+#                 fixed a bug that caused the data of the time series to be saved instead of that of the spectra,
+#                 added keypad-return and focus-out binds to missing settings,
+#                 changed modelling transfer function to complex data for high pass 1st order filter,
+#                 fixed a bug that caused the spectra to be shifted by one frequency bin,
+#                 fixed a bug that caused the normalization index to not be updated
 #   - 09.06.2022: Changed modelling of transfer function to complex data for all filters except high pass 1st order,
 #                 added missing phase models,
 #                 changed color of models to green
