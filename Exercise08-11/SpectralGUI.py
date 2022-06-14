@@ -1951,7 +1951,7 @@ class SpectralGUI:
                 values = np.subtract(values, np.average(values))
             # Store the values to the data buffer
             self.data = values
-            self.data = self.data[1:len(self.data)] + [self.data[0]]
+            #self.data = self.data[1:len(self.data)] + [self.data[0]]
             #self.data = self.data[1:len(self.data)]
             #self.data = np.pad(self.data, (0, 1))
             # Debug test for values that are clearly out of range
