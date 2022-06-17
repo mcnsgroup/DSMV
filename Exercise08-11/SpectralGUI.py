@@ -7,7 +7,7 @@
 # The filter windows can be added externally with the following
 # convention:
 # File name:
-#   Window[Name of the window].m, eg. WindowBlackman.m
+#   Window[Name of the window].py, eg. WindowBlackman.py
 # Inputs:
 #   N: length of the window
 # Returns:
@@ -17,9 +17,12 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 10.06.2022, ver1.18
+# 17.06.2022, ver1.19
 # 
 # Changelog
+#   - 17.06.2022: Added functionality to switch between H(z) and H(s) model for non-FIR filters,
+#                 fixed a bug that caused the normalized spectrum to crash if the selected filter has no index to normalize at,
+#                 #optimized startup and reconnect time
 #   - 10.06.2022: Changed data format for saved files from .txt to .csv,
 #                 added x-data to .csv files,
 #                 fixed a bug that caused the data of the time series to be saved instead of that of the spectra,
@@ -31,7 +34,7 @@
 #                 added missing phase models,
 #                 changed color of models to green
 #                 fixed a bug that caused the phase to not be updated when necessary
-#   - 08.06.2022: Added functionality to display modeled frequency responses and phases
+#   - 08.06.2022: Added functionality to display modeled amplitude responses and phases
 #                 fixed a bug that caused the reading to not continue after a filter settings update
 #   - 07.06.2022: Added normalization option to unit list,
 #                 added functionality to average impulse responses if applicable,
@@ -112,9 +115,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 # Import official modules
-from csv import Dialect
-from hashlib import new
-from re import T
 import numpy as np
 from matplotlib.pyplot import *
 from matplotlib.figure import Figure
@@ -122,7 +122,6 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.animation as animation
 from tkinter import *
 from tkinter import ttk
-from PIL import Image, ImageTk
 import struct
 import time
 import glob
@@ -172,7 +171,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.18")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.19")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -435,9 +434,11 @@ class SpectralGUI:
         self.transformSizeMin = 1
         # Maximum transform size
         self.transformSizeMax = 16384
-        # Initialize phase state
-        self.showPhase = StringVar()
-        self.showPhase.set("Disabled")
+        # Value for phase state
+        self.phaseState = "Disabled"
+        # Strinng variable for phase state
+        self.phaseStateV = StringVar()
+        self.phaseStateV.set(self.phaseState)
         # Create label for the phase selector
         self.showPhaseLabel = Label(master=self.displayFrame, text="Show phase")
         self.uiElements.append(self.showPhaseLabel)
@@ -447,11 +448,11 @@ class SpectralGUI:
         self.uiElements.append(self.phaseFrame)
         self.uiGridParams.append([5, 2, 1, 2, "NESW"])
         # Create phase selector buttons
-        self.phaseDisButton = Radiobutton(self.phaseFrame, text="Disabled", variable = self.showPhase, value = "Disabled")
+        self.phaseDisButton = Radiobutton(self.phaseFrame, text="Disabled", variable = self.phaseStateV, value = "Disabled")
         self.uiElements.append(self.phaseDisButton)
         self.uiGridParams.append([0, 0, 1, 1, "E"])
         self.phaseDisButton.bind("<Button-1>", self.handle_phaseDis)
-        self.phaseEnButton = Radiobutton(self.phaseFrame, text="Enabled", variable = self.showPhase, value = "Enabled")
+        self.phaseEnButton = Radiobutton(self.phaseFrame, text="Enabled", variable = self.phaseStateV, value = "Enabled")
         self.uiElements.append(self.phaseEnButton)
         self.uiGridParams.append([0, 1, 1, 1, "W"])
         self.phaseEnButton.bind("<Button-1>", self.handle_phaseEn)
@@ -465,7 +466,7 @@ class SpectralGUI:
         self.tabsystem.add(self.filterFrame, text='Filter settings')
         #self.uiElements.append(self.filterFrame)
         #self.uiGridParams.append([0, 1, 1, 1, "NESW"])
-        self.filterFrame.columnconfigure(1, weight=1)
+        self.filterFrame.columnconfigure((1, 3), weight=1)
         # Create frame for the individual widgets
         # Create label for the signal filter selector
         self.filterSelectLabel = Label(master=self.filterFrame, text="Signal Filter")
@@ -478,7 +479,7 @@ class SpectralGUI:
         # Create combo box for filter selector
         self.filterSelect = ttk.Combobox(master=self.filterFrame, values = self.filters, state="readonly")
         self.uiElements.append(self.filterSelect)
-        self.uiGridParams.append([0, 1, 1, 1, "WE"])
+        self.uiGridParams.append([0, 1, 1, 3, "WE"])
         self.filterSelect.bind("<<ComboboxSelected>>", self.handle_updateFilter)
         self.filterDefault = "Scaling"
         filterDefIndex = self.filters.index(self.filterDefault)
@@ -507,7 +508,7 @@ class SpectralGUI:
         # Create filter property 1 entry box
         self.prop1Entry = Entry(master=self.filterFrame, textvariable=self.prop1V, justify=RIGHT)
         self.uiElements.append(self.prop1Entry)
-        self.uiGridParams.append([1, 1, 1, 1, "WE"])
+        self.uiGridParams.append([1, 1, 1, 3, "WE"])
         self.prop1Entry.bind("<Return>", self.handle_updateProp1)
         self.prop1Entry.bind("<KP_Enter>", self.handle_updateProp1)
         self.prop1Entry.bind("<FocusOut>", self.handle_updateProp1)
@@ -533,7 +534,7 @@ class SpectralGUI:
         # Create filter property 2 entry box
         self.prop2Entry = Entry(master=self.filterFrame, textvariable=self.prop2V, justify=RIGHT)
         self.uiElements.append(self.prop2Entry)
-        self.uiGridParams.append([2, 1, 1, 1, "WE"])
+        self.uiGridParams.append([2, 1, 1, 3, "WE"])
         self.prop2Entry.bind("<Return>", self.handle_updateProp2)
         self.prop2Entry.bind("<KP_Enter>", self.handle_updateProp2)
         self.prop2Entry.bind("<FocusOut>", self.handle_updateProp2)
@@ -559,7 +560,7 @@ class SpectralGUI:
         # Create filter property 3 entry box
         self.prop3Entry = Entry(master=self.filterFrame, textvariable=self.prop3V, justify=RIGHT)
         self.uiElements.append(self.prop3Entry)
-        self.uiGridParams.append([3, 1, 1, 1, "WE"])
+        self.uiGridParams.append([3, 1, 1, 3, "WE"])
         self.prop3Entry.bind("<Return>", self.handle_updateProp3)
         self.prop3Entry.bind("<KP_Enter>", self.handle_updateProp3)
         self.prop3Entry.bind("<FocusOut>", self.handle_updateProp3)
@@ -587,30 +588,61 @@ class SpectralGUI:
         # Create combo box for window selector
         self.windowSelect = ttk.Combobox(master=self.filterFrame, values = self.windows, state="readonly")
         self.uiElements.append(self.windowSelect)
-        self.uiGridParams.append([4, 1, 1, 1, "WE"])
+        self.uiGridParams.append([4, 1, 1, 3, "WE"])
         self.windowSelect.bind("<<ComboboxSelected>>", self.handle_updateWindow)
         self.windowSelect.set(str(self.prop4Value[self.filterIndex]))
-        # Initialize model state
-        self.showModel = StringVar()
-        self.showModel.set("Disabled")
+        # Value for model state
+        self.modelState = "Disabled"
+        # String variable for model state
+        self.modelStateV = StringVar()
+        self.modelStateV.set(self.modelState)
         # Create label for the model selector
-        self.showModelLabel = Label(master=self.filterFrame, text="Show model")
-        self.uiElements.append(self.showModelLabel)
+        self.modelLabel = Label(master=self.filterFrame, text="Model")
+        self.uiElements.append(self.modelLabel)
         self.uiGridParams.append([5, 0, 1, 1, "E"])
         # Create frame for the model selector
         self.modelFrame = Frame(master=self.filterFrame)
         self.uiElements.append(self.modelFrame)
-        self.uiGridParams.append([5, 1, 1, 2, "NESW"])
+        self.uiGridParams.append([5, 1, 1, 1, "NESW"])
         # Create model selector buttons
-        self.modelDisButton = Radiobutton(self.modelFrame, text="Disabled", variable = self.showModel, value = "Disabled")
+        self.modelDisButton = Radiobutton(self.modelFrame, text="Disabled", variable = self.modelStateV, value="Disabled")
         self.uiElements.append(self.modelDisButton)
         self.uiGridParams.append([0, 0, 1, 1, "E"])
         self.modelDisButton.bind("<Button-1>", self.handle_modelDis)
-        self.modelEnButton = Radiobutton(self.modelFrame, text="Enabled", variable = self.showModel, value = "Enabled")
-        self.uiElements.append(self.modelEnButton)
+        self.modelHzButton = Radiobutton(self.modelFrame, text="H(z)", variable = self.modelStateV, value="H(z)")
+        self.uiElements.append(self.modelHzButton)
         self.uiGridParams.append([0, 1, 1, 1, "W"])
-        self.modelEnButton.bind("<Button-1>", self.handle_modelEn)
-        
+        self.modelHzButton.bind("<Button-1>", self.handle_modelHz)
+        self.modelHsButton = Radiobutton(self.modelFrame, text="H(s)", variable = self.modelStateV, value="H(s)")
+        self.uiElements.append(self.modelHsButton)
+        self.uiGridParams.append([0, 2, 1, 1, "W"])
+        self.modelHsButton.bind("<Button-1>", self.handle_modelHs)
+        # Array to store wether there is a H(z) to display for the respective filter
+        self.hzEnabled = [True, True, True, True, True, True, True, True, True, True, False]
+        # Array to store wether there is a H(s) to display for the respective filter
+        self.hsEnabled = [True, True, True, True, False, False, False, False, True, True, False]
+        # Value for arithmetic
+        self.arithmetic = "Integer"
+        # String variable for arithmetic
+        self.arithmeticV = StringVar()
+        self.arithmeticV.set(self.arithmetic)
+        # Create label for the arithmetic selector
+        self.arithmeticLabel = Label(master=self.filterFrame, text="Arithmetic")
+        self.uiElements.append(self.arithmeticLabel)
+        self.uiGridParams.append([5, 2, 1, 1, "E"])
+        # Create frame for the arithmetic selector
+        self.arithmeticFrame = Frame(master=self.filterFrame)
+        self.uiElements.append(self.arithmeticFrame)
+        self.uiGridParams.append([5, 3, 1, 1, "NESW"])
+        # Create arithmetic selector buttons
+        self.arithmeticIntButton = Radiobutton(self.arithmeticFrame, text="Integer", variable = self.arithmeticV, value="Integer")
+        self.uiElements.append(self.arithmeticIntButton)
+        self.uiGridParams.append([0, 0, 1, 1, "E"])
+        self.arithmeticIntButton.bind("<Button-1>", self.handle_arithmeticInt)
+        self.arithmeticFloatButton = Radiobutton(self.arithmeticFrame, text="Float", variable = self.arithmeticV, value="Float")
+        self.uiElements.append(self.arithmeticFloatButton)
+        self.uiGridParams.append([0, 1, 1, 1, "W"])
+        self.arithmeticFloatButton.bind("<Button-1>", self.handle_arithmeticFloat)
         
         
         
@@ -662,6 +694,7 @@ class SpectralGUI:
         self.voltage, = self.ax1.plot(self.x, self.voltagePre, 'b.-', label="Impulse response", linewidth=0.5)
         # Legend for time series
         self.legendImpulse = self.ax1.legend(loc="upper right", title="Averaged impulse responses: 1")
+        self.legendImpulse.set_visible(False)
         # Create the canvas
         canvas1 = FigureCanvasTkAgg(self.fig1)
         canvas1.draw()
@@ -686,12 +719,7 @@ class SpectralGUI:
             # save the image
             self.fig1.savefig(path + ".svg")
             # save the data as csv file
-            f = open(path + ".csv", mode = "w")
-            savedataX = str(self.voltage.get_xdata().tolist())
-            savedataY = str(self.voltage.get_ydata().tolist())
-            savedata = savedataX[1:len(savedataX)-1] + "\n" + savedataY[1:len(savedataY)-1]
-            f.write(savedata)
-            f.close
+            L.savePlotCSV(self.voltage, path)
             # display the saved message
             self.saveLabel1.configure(text="Saved as " + path + "!")
             # schedule message removal
@@ -786,7 +814,7 @@ class SpectralGUI:
         # List of all plot titles
         self.plotTitles = []
         # Check for phase setting
-        if self.showPhase.get() == "Enabled":
+        if self.phaseState == "Enabled":
             # Legend for frequency-phase diagram
             self.legendSpectra = self.ax3.legend(self.plots, self.plotTitles, loc="upper right", title="Averaged spectra: 1")
         else:
@@ -817,20 +845,9 @@ class SpectralGUI:
             path = L.savePath("Spectrum", self.dir)
             # save the image
             self.fig2.savefig(path + ".svg")
-            # save the data of spectrum 1 as csv file
-            f = open(path + "_1" + ".csv", mode = "w")
-            savedataX = str(self.spectrum1.get_xdata().tolist())
-            savedataY = str(self.spectrum1.get_ydata().tolist())
-            savedata = savedataX[1:len(savedataX)-1] + "\n" + savedataY[1:len(savedataY)-1]
-            f.write(savedata)
-            f.close
-            # save the data of spectrum 2 as csv file
-            f = open(path + "_2" + ".csv", mode = "w")
-            savedataX = str(self.spectrum2.get_xdata().tolist())
-            savedataY = str(self.spectrum2.get_ydata().tolist())
-            savedata = savedataX[1:len(savedataX)-1] + "\n" + savedataY[1:len(savedataY)-1]
-            f.write(savedata)
-            f.close
+            # save the data of spectra as csv file
+            L.savePlotCSV(self.spectrum1, path + "_1")
+            L.savePlotCSV(self.spectrum2, path + "_2")
             # display the saved message
             self.saveLabel2.configure(text="Saved as " + path + "!")
             # schedule message removal
@@ -918,7 +935,7 @@ class SpectralGUI:
         self.window.after(0, self.checkConnection)
         # Execute the function to read with the mainloop of the window (this is probably not the best solution)
         self.window.mainloop()
-
+    
     # Update all board values since the program might still be running with different values from a previous session
     def updateAll(self, init):
         pre = "Initializing... "
@@ -952,7 +969,7 @@ class SpectralGUI:
         self.waitLabel.grid_forget()
     
     # Event handler for operation mode selector
-    def handle_updateMode(self, event=0, recursive=False, recReact=False, val=None):
+    def handle_updateMode(self, event=None, recursive=False, recReact=False, val=None):
         newMode = self.modeSelect.get()
         if val != None:
             newMode = val
@@ -995,7 +1012,8 @@ class SpectralGUI:
                 self.windowSelect1["state"] = DISABLED
                 self.windowSelect2["state"] = DISABLED
                 self.modelDisButton["state"] = NORMAL
-                self.modelEnButton["state"] = NORMAL
+                self.modelHzButton["state"] = NORMAL
+                self.modelHsButton["state"] = NORMAL
                 self.spectral = False
                 self.unitSelect.set("Normalized Spectrum")
                 self.handle_updateUnit()
@@ -1010,25 +1028,23 @@ class SpectralGUI:
                 self.windowSelect1["state"] = NORMAL
                 self.windowSelect2["state"] = NORMAL
                 self.modelDisButton["state"] = DISABLED
-                self.modelEnButton["state"] = DISABLED
+                self.modelHzButton["state"] = DISABLED
+                self.modelHsButton["state"] = DISABLED
                 self.legendImpulse.set_visible(False)
                 self.handle_modelDis()
-            #L.pln("Updating mode to " + str(self.mode))
             self.port.writeL('set mode ' + str(self.mode))
-            #L.pln("Mode updated")
             self.port.clearBuffer()
             self.readNext = True
             self.updateAxes()
             # Reactivate reading if paused by this function
             self.reading = react
-            #L.pln("Reactivating: " + str(react))
             if react:
                 self.window.after(0, self.readDisp)
             # resign from power
             self.busy = False
 
     # Event handler for samplerate entry box
-    def handle_updateFreq(self, event=0, force=False, recursive=False, recReact=False, val=None):
+    def handle_updateFreq(self, event=None, force=False, recursive=False, recReact=False, val=None):
         # Make sure the input is a number
         try:
             newSamplerate = float(self.freqEntry.get())
@@ -1075,7 +1091,7 @@ class SpectralGUI:
         self.window.update_idletasks()
     
     # Event handler for data size entry box
-    def handle_updateSize(self, event=0, force=False, recursive=False, recReact=False, val=None):
+    def handle_updateSize(self, event=None, force=False, recursive=False, recReact=False, val=None):
         # Make sure the input is an integer
         if self.sizeEntry.get().isdigit():
             newSize = int(self.sizeEntry.get())
@@ -1127,7 +1143,7 @@ class SpectralGUI:
         self.window.update_idletasks()
     
     # Event handler for oversamples entry box
-    def handle_updateOvers(self, event=0, force=False, recursive=False, recReact=False, val=None):
+    def handle_updateOvers(self, event=None, force=False, recursive=False, recReact=False, val=None):
         # Make sure the input is an integer
         if self.oversEntry.get().isdigit():
             newOvers = int(self.oversEntry.get())
@@ -1169,7 +1185,7 @@ class SpectralGUI:
         self.window.update_idletasks()
     
     # Event handler for processing rate input box
-    def handle_updateProc(self, event=0, force=False, recursive=False, recReact=False, val=None):
+    def handle_updateProc(self, event=None, force=False, recursive=False, recReact=False, val=None):
         # Make sure the input is a number
         try:
             newProc = float(self.procEntry.get())
@@ -1256,6 +1272,7 @@ class SpectralGUI:
             self.f2 = self.f2[1:len(self.f2)]
         # Update the axes data
         self.voltage.set_xdata(self.x)
+        #self.spectrum1.set_xdata(self.f1[1:len(self.f1)])
         self.spectrum1.set_xdata(self.f1)
         self.spectrum2.set_xdata(self.f2)
         self.phase1.set_xdata(self.f1)
@@ -1276,14 +1293,14 @@ class SpectralGUI:
         self.ax1.set_xlim([0, tMax])
         # Set frequency axis limits to match data
         self.ax2.set_xlim([0, fMax])
-        if self.showPhase.get() == "Enabled":
+        if self.phaseState == "Enabled":
             self.ax3.set_xlim([0, fMax])
         # Redraw the model
         self.drawModelCurve()
         # Update the canvases
         L.updateCanvas(self.fig1.canvas, self.ax1, False, True)
         L.updateCanvas(self.fig2.canvas, self.ax2, False, True)
-        if self.showPhase.get() == "Enabled":
+        if self.phaseState == "Enabled":
             L.updateCanvas(self.fig2.canvas, self.ax3, False, True)
     
     # Callback function for changing the y-scale to "Logarithmic"
@@ -1299,16 +1316,16 @@ class SpectralGUI:
         L.updateCanvas(self.fig2.canvas, self.ax2, False, True)
     
     # Event handler for window selector 1
-    def handle_updateWindow1(self, event=0):
+    def handle_updateWindow1(self, event=None):
         if self.window1.get() == "Disabled":
             self.spectrum1.set_visible(False)
-            if self.showPhase.get() == "Enabled":
+            if self.phaseState == "Enabled":
                 self.phase1.set_visible(False)
             self.maxAnnotation1.set_visible(False)
             self.dataTipSpectrum1.setState(DISABLED)
         else:
             self.spectrum1.set_visible(True)
-            if self.showPhase.get() == "Enabled":
+            if self.phaseState == "Enabled":
                 self.phase1.set_visible(True)
             self.maxAnnotation1.set_visible(True)
             self.dataTipSpectrum1.setState(NORMAL)
@@ -1316,16 +1333,16 @@ class SpectralGUI:
             self.resetYSpectra()
     
     # Event handler for window selector 1
-    def handle_updateWindow2(self, event=0):
+    def handle_updateWindow2(self, event=None):
         if self.window2.get() == "Disabled":
             self.spectrum2.set_visible(False)
-            if self.showPhase.get() == "Enabled":
+            if self.phaseState == "Enabled":
                 self.phase2.set_visible(False)
             self.maxAnnotation2.set_visible(False)
             self.dataTipSpectrum2.setState(DISABLED)
         else:
             self.spectrum2.set_visible(True)
-            if self.showPhase.get() == "Enabled":
+            if self.phaseState == "Enabled":
                 self.phase2.set_visible(True)
             self.maxAnnotation2.set_visible(True)
             self.dataTipSpectrum2.setState(NORMAL)
@@ -1333,7 +1350,7 @@ class SpectralGUI:
             self.resetYSpectra()
     
     # Event handler for spectrum unit selector (also used by readDisp)
-    def handle_updateUnit(self, event=0):
+    def handle_updateUnit(self, event=None):
         self.ax2.set_ylabel(self.unitLabels[self.unitList.index(self.unitSelect.get())])
         if self.unitSelect.get() == "Power Spectral Density":
             S1 = np.divide(np.power(np.divide(self.S1Pre, self.averaged), 2), self.enbw1)
@@ -1348,8 +1365,12 @@ class SpectralGUI:
             S1 = np.divide(self.S1Pre, self.averaged)
             S2 = np.divide(self.S2Pre, self.averaged)
         elif self.unitSelect.get() == "Normalized Spectrum":
-            S1 = np.divide(self.S1Pre, self.S1Pre[self.normIndex[self.filterIndex]])
-            S2 = np.divide(self.S2Pre, self.S2Pre[self.normIndex[self.filterIndex]])
+            if self.normIndex[self.filterIndex] == None:
+                S1 = self.S1Pre
+                S2 = self.S2Pre
+            else:
+                S1 = np.divide(self.S1Pre, self.S1Pre[self.normIndex[self.filterIndex]])
+                S2 = np.divide(self.S2Pre, self.S2Pre[self.normIndex[self.filterIndex]])
         self.spectrum1.set_ydata(S1)
         self.spectrum2.set_ydata(S2)
         self.dots.set_ydata([S1[self.startFindex], S1[self.endFindex]])
@@ -1375,8 +1396,9 @@ class SpectralGUI:
         self.readNext = True
     
     # Callback function for changing the phase to "Disabled"
-    def handle_phaseDis(self, event=0):
-        self.showPhase.set("Disabled")
+    def handle_phaseDis(self, event=None):
+        self.phaseState = "Disabled"
+        self.phaseStateV.set(self.phaseState)
         # Hide phases
         self.phase1.set_visible(False)
         self.phase2.set_visible(False)
@@ -1385,7 +1407,8 @@ class SpectralGUI:
     
     # Callback function for changing the phase to "Enabled"
     def handle_phaseEn(self, event):
-        self.showPhase.set("Enabled")
+        self.phaseState  = "Enabled"
+        self.phaseStateV.set(self.phaseState)
         # Display phases
         if self.window1.get() != "Disabled":
             self.phase1.set_visible(True)
@@ -1395,7 +1418,7 @@ class SpectralGUI:
         self.drawModelCurve()
     
     # Event handler for transform size entry box
-    def handle_updateTransformSize1(self, event=0):
+    def handle_updateTransformSize1(self, event=None):
         # Stop reading during update
         reactivate = False
         if self.reading:
@@ -1424,7 +1447,7 @@ class SpectralGUI:
             self.window.after(0, self.readDisp)
     
     # Event handler for transform size entry box
-    def handle_updateTransformSize2(self, event=0):
+    def handle_updateTransformSize2(self, event=None):
         # Stop reading during update
         reactivate = False
         if self.reading:
@@ -1466,7 +1489,7 @@ class SpectralGUI:
         self.handle_updateSize(force=True)
     
     # Event handler for signal filter selector
-    def handle_updateFilter(self, event=0, recursive=False, recReact=False, val=None):
+    def handle_updateFilter(self, event=None, recursive=False, recReact=False, val=None):
         newFilter = self.filterSelect.get()
         if val != None:
             newFilter = val
@@ -1497,26 +1520,45 @@ class SpectralGUI:
                     self.prop4Label.configure(text=self.prop4Names[k])
                     if self.prop1Visible[k]:
                         self.prop1Label.grid(row=1, column=0, sticky="E")
-                        self.prop1Entry.grid(row=1, column=1, sticky="WE")
+                        self.prop1Entry.grid(row=1, column=1, columnspan=3, sticky="WE")
                     else:
                         pass
                     if self.prop2Visible[k]:
                         self.prop2Label.grid(row=2, column=0, sticky="E")
-                        self.prop2Entry.grid(row=2, column=1, sticky="WE")
+                        self.prop2Entry.grid(row=2, column=1, columnspan=3, sticky="WE")
                     else:
                         pass
                     if self.prop3Visible[k]:
                         self.prop3Label.grid(row=3, column=0, sticky="E")
-                        self.prop3Entry.grid(row=3, column=1, sticky="WE")
+                        self.prop3Entry.grid(row=3, column=1, columnspan=3, sticky="WE")
                     else:
                         pass
                     if self.prop4Visible[k]:
                         self.prop4Label.grid(row=4, column=0, sticky="E")
-                        self.windowSelect.grid(row=4, column=1, sticky="WE")
+                        self.windowSelect.grid(row=4, column=1, columnspan=3, sticky="WE")
                     self.prop1V.set(self.prop1Value[k])
                     self.prop2V.set(self.prop2Value[k])
                     self.prop3V.set(self.prop3Value[k])
                     self.windowSelect.set(str(self.prop4Value[k]))
+                    # Possibly adjust setting for model state
+                    if self.hzEnabled[k]:
+                        self.modelHzButton["state"] = NORMAL
+                    else:
+                        self.modelHzButton["state"] = DISABLED
+                        if self.modelState == "H(z)":
+                            if self.hsEnabled[k]:
+                                self.handle_modelHs()
+                            else:
+                                self.handle_modelDis()
+                    if self.hsEnabled[k]:
+                        self.modelHsButton["state"] = NORMAL
+                    else:
+                        self.modelHsButton["state"] = DISABLED
+                        if self.modelState == "H(s)":
+                            if self.hzEnabled[k]:
+                                self.handle_modelHz()
+                            else:
+                                self.handle_modelDis()
             self.port.writeL("set filter " + newFilter)
             self.resetYSpectra()
             # Clear the buffer
@@ -1539,7 +1581,7 @@ class SpectralGUI:
             self.handle_updateProp4(force=True)
     
     # Event handler for filter property 1 entry box
-    def handle_updateProp1(self, event=0, force=False, recursive=False, recReact=False, val=None):
+    def handle_updateProp1(self, event=None, force=False, recursive=False, recReact=False, val=None):
         # Make sure the input has the correct type
         newProp = self.prop1Value[self.filterIndex]
         if self.prop1Type[self.filterIndex] == "Integer":
@@ -1596,7 +1638,7 @@ class SpectralGUI:
         self.window.update_idletasks()
     
     # Event handler for filter property 2 entry box
-    def handle_updateProp2(self, event=0, force=False, recursive=False, recReact=False, val=None):
+    def handle_updateProp2(self, event=None, force=False, recursive=False, recReact=False, val=None):
         # Make sure the input has the correct type
         newProp = self.prop2Value[self.filterIndex]
         if self.prop2Type[self.filterIndex] == "Integer":
@@ -1653,7 +1695,7 @@ class SpectralGUI:
         self.window.update_idletasks()
     
     # Event handler for filter property 3 entry box
-    def handle_updateProp3(self, event=0, force=False, recursive=False, recReact=False, val=None):
+    def handle_updateProp3(self, event=None, force=False, recursive=False, recReact=False, val=None):
         # Make sure the input has the correct type
         newProp = self.prop3Value[self.filterIndex]
         if self.prop3Type[self.filterIndex] == "Integer":
@@ -1710,7 +1752,7 @@ class SpectralGUI:
         self.window.update_idletasks()
     
     # Event handler for filter property 4 selector
-    def handle_updateWindow(self, event):
+    def handle_updateWindow(self, event=None):
         self.prop4V.set(self.windowSelect.get())
         self.handle_updateProp4()
     
@@ -1771,63 +1813,115 @@ class SpectralGUI:
         self.prop4V.set(str(self.prop4Value[self.filterIndex]))
         self.window.update_idletasks()
     
-    # Callback function for changing the model to "Disabled"
-    def handle_modelDis(self, event=0):
-        self.showModel.set("Disabled")
-        # Hide models
-        self.transferModel.set_visible(False)
-        self.phaseModel.set_visible(False)
-        # Update the canvas
-        self.window.update_idletasks()
+    # Function to update the model state and its radiobuttons
+    def updateModelState(self):
+        # Set string variable
+        self.modelStateV.set(self.modelState)
+        # Hide/show models
+        if self.modelState == "Disabled":
+            self.transferModel.set_visible(False)
+            self.phaseModel.set_visible(False)
+        else:
+            self.transferModel.set_visible(True)
+            if self.phaseState != "Disabled":
+                self.phaseModel.set_visible(True)
+        self.drawModelCurve()
         L.updateCanvas(self.fig2.canvas, self.ax2, False, True)
-        self.window.update_idletasks()
     
-    # Callback function for changing the model to "Enabled"
-    def handle_modelEn(self, event):
-        self.showModel.set("Enabled")
-        # Display models
-        self.transferModel.set_visible(True)
-        if self.showPhase.get() != "Disabled":
-            self.phaseModel.set_visible(True)
+    # Callback function for changing the model to "Disabled"
+    def handle_modelDis(self, event=None):
+        self.modelState = "Disabled"
+        self.updateModelState()
+    
+    # Callback function for changing the model to "H(z)"
+    def handle_modelHz(self, event=None):
+        self.modelState = "H(z)"
+        self.updateModelState()
+    
+    # Callback function for changing the model to "H(s)"
+    def handle_modelHs(self, event=None):
+        self.modelState = "H(s)"
+        self.updateModelState()
+    
+    # Function to update the arithmetic and its radiobuttons
+    def updateArithmetic(self):
+        # Set string variable
+        self.arithmeticV.set(self.arithmetic)
+        # Write command to serial port
+        self.port.writeL("set arithmetic " + self.arithmetic)
+    
+    # Callback function for changing the arithmetic to "Integer"
+    def handle_arithmeticInt(self, event=None):
+        self.arithmetic = "Integer"
+        self.updateArithmetic()
+    
+    # Callback function for changing the arithmetic to "Float"
+    def handle_arithmeticFloat(self, event=None):
+        self.arithmetic = "Float"
+        self.updateArithmetic()
     
     # Function to draw the modelled transfer function and phase
     def drawModelCurve(self):
-        if self.filterSelect.get() == "Scaling":
+        if self.modelState == "Disabled":
+            self.transferModel.set_visible(False)
+            self.phaseModel.set_visible(False)
+            return
+        curFilter = self.filters[self.filterIndex]
+        if curFilter == "Scaling":
             self.transferModel.set_ydata([1] * (self.freqs1 - 1))
             phases = np.linspace(0, -2*np.pi, self.freqs1)
             phases = phases[1:len(phases)]
             self.phaseModel.set_ydata(phases)
-        elif self.filterSelect.get() == "Moving average":
-            hma = np.divide(np.subtract(np.exp(np.multiply(np.multiply(1j, 2*np.pi*self.prop1Value[self.filterIndex]/self.proc), self.f1)), 1), 
+        elif curFilter == "Moving average":
+            hma = None
+            if self.modelState == "H(z)":
+                hma = np.divide(np.subtract(np.exp(np.multiply(np.multiply(1j, 2*np.pi*self.prop1Value[self.filterIndex]/self.proc), self.f1)), 1), 
+                            np.subtract(np.exp(np.multiply(np.multiply(1j, 2*np.pi/self.proc), self.f1)), 1))
+            elif self.modelState == "H(s)":
+                hma = np.divide(np.subtract(np.exp(np.multiply(np.multiply(1j, 2*np.pi*self.prop1Value[self.filterIndex]/self.proc), self.f1)), 1), 
                             np.subtract(np.exp(np.multiply(np.multiply(1j, 2*np.pi/self.proc), self.f1)), 1))
             hma = np.divide(hma, np.abs(hma[self.normIndex[self.filterIndex]]))
             self.transferModel.set_ydata(np.abs(hma))
             self.phaseModel.set_ydata(-np.angle(hma))
             # Hier ist die Phase falsch
-        elif self.filterSelect.get() == "Low pass filter 1st order":
+        elif curFilter == "Low pass filter 1st order":
             # Catch case of f_c=0
             if self.prop1Value[self.filterIndex] == 0:
                 self.transferModel.set_visible(False)
                 self.phaseModel.set_visible(False)
                 return
-            hlpf = np.divide(1, np.add(1, np.multiply(1j/self.prop1Value[self.filterIndex], self.f1)))
+            hlpf = None
+            if self.modelState == "H(z)":
+                hlpf = np.divide(1, np.add(1, np.multiply(self.proc/(2*np.pi*self.prop1Value[self.filterIndex]), np.subtract(1, np.exp(np.multiply(-2*np.pi*1j/self.proc, self.f1))))))
+                #hlpf = np.divide(1, np.add(1, np.divide(np.exp(np.multiply(1j*2*np.pi/self.proc, self.f1)), 2*np.pi*self.prop1Value[self.filterIndex])))
+            elif self.modelState == "H(s)":
+                hlpf = np.divide(1, np.add(1, np.multiply(1j/self.prop1Value[self.filterIndex], self.f1)))
+            #hlpf = np.divide(1, np.add(1, np.divide(np.exp(np.multiply(1j*2*np.pi/self.proc, self.f1)), 2*np.pi*self.prop1Value[self.filterIndex])))
             hlpf = np.divide(hlpf, np.abs(hlpf[self.normIndex[self.filterIndex]]))
             self.transferModel.set_ydata(abs(hlpf))
             self.phaseModel.set_ydata(np.angle(hlpf))
-        elif self.filterSelect.get() == "High pass filter 1st order":
-            # Hier warte ich noch auf die korrekte komplexe Formel
-            #hhpf = np.power(np.divide(pow(self.prop1Value[self.filterIndex], 2), np.add(np.power(self.transferModel.get_xdata(), 2), pow(self.prop1Value[self.filterIndex], 2))), 1/2)
-            hhpf = np.divide(1, np.subtract(1, np.divide(1j*self.prop1Value[self.filterIndex], self.f1)))
+        elif curFilter == "High pass filter 1st order":
+            hhpf = None
+            if self.modelState == "H(z)":
+                hhpf = np.divide(1, np.add(1, np.divide(2*np.pi*self.prop1Value[self.filterIndex]/self.proc, np.subtract(1, np.exp(np.multiply(-2*np.pi*1j/self.proc, self.f1))))))
+                np.divide(1, np.subtract(1, np.divide(1j*self.prop1Value[self.filterIndex], self.f1)))
+            elif self.modelState == "H(s)":
+                hhpf = np.divide(1, np.subtract(1, np.divide(1j*self.prop1Value[self.filterIndex], self.f1)))
             hhpf = np.divide(hhpf, np.abs(hhpf[self.normIndex[self.filterIndex]]))
             self.transferModel.set_ydata(abs(hhpf))
             self.phaseModel.set_ydata(np.angle(hhpf))
-        elif self.filterSelect.get() == "FIR bandpass filter":
+        elif curFilter == "FIR bandpass filter":
             nFilter = self.prop3Value[self.filterIndex]
             k = np.linspace(-nFilter/2, nFilter/2, nFilter+1)
             phi1 = 2*np.pi*self.prop1Value[self.filterIndex] / self.proc
             phi2 = 2*np.pi*self.prop2Value[self.filterIndex] / self.proc
-            hres = np.divide((np.sin(np.multiply(phi2, k)) - np.sin(np.multiply(phi1, k))), np.multiply(np.pi, k))
-            hres[int((len(hres)-1) / 2)] = (phi2-phi1) / np.pi
+            hres = None
+            if self.modelState == "H(z)":
+                hres = np.divide((np.sin(np.multiply(phi2, k)) - np.sin(np.multiply(phi1, k))), np.multiply(np.pi, k))
+                hres[int((len(hres)-1) / 2)] = (phi2-phi1) / np.pi
+            elif self.modelState == "H(s)":
+                hres = np.divide((np.sin(np.multiply(phi2, k)) - np.sin(np.multiply(phi1, k))), np.multiply(np.pi, k))
+                hres[int((len(hres)-1) / 2)] = (phi2-phi1) / np.pi
             self.prop1Value[self.filterIndex]
             self.normIndex[self.filterIndex] = int((self.prop1Value[self.filterIndex] + self.prop2Value[self.filterIndex]) * 
                                                     len(self.transferModel.get_xdata()) / self.proc)
@@ -1835,64 +1929,87 @@ class SpectralGUI:
             Hzf = Hzf[1:int(len(Hzf)/2)+1]
             self.transferModel.set_ydata(np.divide(abs(Hzf), abs(Hzf)[self.normIndex[self.filterIndex]]))
             self.phaseModel.set_ydata(np.angle(Hzf))
-        elif self.filterSelect.get() == "FIR bandstop filter":
+        elif curFilter == "FIR bandstop filter":
             nFilter = self.prop3Value[self.filterIndex]
             k = np.linspace(-nFilter/2, nFilter/2, nFilter+1)
             phi1 = 2*np.pi*self.prop1Value[self.filterIndex] / self.proc
             phi2 = 2*np.pi*self.prop2Value[self.filterIndex] / self.proc
-            hres = -np.divide((np.sin(np.multiply(phi2, k)) - np.sin(np.multiply(phi1, k))), np.multiply(np.pi, k))
-            hres[int((len(hres)-1) / 2)] = 1 - (phi2-phi1) / np.pi
+            hres = None
+            if self.modelState == "H(z)":
+                hres = -np.divide((np.sin(np.multiply(phi2, k)) - np.sin(np.multiply(phi1, k))), np.multiply(np.pi, k))
+                hres[int((len(hres)-1) / 2)] = 1 - (phi2-phi1) / np.pi
+            elif self.modelState == "H(s)":
+                hres = -np.divide((np.sin(np.multiply(phi2, k)) - np.sin(np.multiply(phi1, k))), np.multiply(np.pi, k))
+                hres[int((len(hres)-1) / 2)] = 1 - (phi2-phi1) / np.pi
             Hzf = np.fft.fft(hres, n=2*len(self.transferModel.get_xdata()))
             Hzf = Hzf[1:int(len(Hzf)/2)+1]
             self.transferModel.set_ydata(np.divide(abs(Hzf), abs(Hzf)[self.normIndex[self.filterIndex]]))
             self.phaseModel.set_ydata(np.angle(Hzf))
-        elif self.filterSelect.get() == "FIR low pass filter":
+        elif curFilter == "FIR low pass filter":
             nFilter = self.prop3Value[self.filterIndex]
             k = np.linspace(-nFilter/2, nFilter/2, nFilter+1)
             phic = 2*np.pi*self.prop1Value[self.filterIndex] / self.proc
-            hres = np.divide(np.sin(np.multiply(phic, k)), np.multiply(np.pi, k))
-            hres[int((len(hres)-1) / 2)] = phic / np.pi
+            hres = None
+            if self.modelState == "H(z)":
+                hres = np.divide(np.sin(np.multiply(phic, k)), np.multiply(np.pi, k))
+                hres[int((len(hres)-1) / 2)] = phic / np.pi
+            elif self.modelState == "H(s)":
+                hres = np.divide(np.sin(np.multiply(phic, k)), np.multiply(np.pi, k))
+                hres[int((len(hres)-1) / 2)] = phic / np.pi
             Hzf = np.fft.fft(hres, n=2*len(self.transferModel.get_xdata()))
             Hzf = Hzf[1:int(len(Hzf)/2)+1]
             self.transferModel.set_ydata(np.divide(abs(Hzf), abs(Hzf)[self.normIndex[self.filterIndex]]))
             self.phaseModel.set_ydata(np.angle(Hzf))
-        elif self.filterSelect.get() == "FIR high pass filter":
+        elif curFilter == "FIR high pass filter":
             nFilter = self.prop3Value[self.filterIndex]
             k = np.linspace(-nFilter/2, nFilter/2, nFilter+1)
             phic = 2*np.pi*self.prop1Value[self.filterIndex] / self.proc
-            hres = np.subtract(np.divide(np.sin(np.multiply(np.pi, k)), np.multiply(np.pi, k)), np.divide(np.sin(np.multiply(phic, k)), np.multiply(np.pi, k)))
-            hres[int((len(hres)-1) / 2)] = 1 - phic / np.pi
+            hres = None
+            if self.modelState == "H(z)":
+                hres = np.subtract(np.divide(np.sin(np.multiply(np.pi, k)), np.multiply(np.pi, k)), np.divide(np.sin(np.multiply(phic, k)), np.multiply(np.pi, k)))
+                hres[int((len(hres)-1) / 2)] = 1 - phic / np.pi
+            elif self.modelState == "H(s)":
+                hres = np.subtract(np.divide(np.sin(np.multiply(np.pi, k)), np.multiply(np.pi, k)), np.divide(np.sin(np.multiply(phic, k)), np.multiply(np.pi, k)))
+                hres[int((len(hres)-1) / 2)] = 1 - phic / np.pi
             Hzf = np.fft.fft(hres, n=2*len(self.transferModel.get_xdata()))
             Hzf = Hzf[1:int(len(Hzf)/2)+1]
             self.transferModel.set_ydata(np.divide(abs(Hzf), abs(Hzf)[self.normIndex[self.filterIndex]]))
             self.phaseModel.set_ydata(np.angle(Hzf))
-        elif self.filterSelect.get() == "Low pass filter 2nd order":
+        elif curFilter == "Low pass filter 2nd order":
             # Catch case of f_c=0
             if self.prop1Value[self.filterIndex] == 0:
                 self.transferModel.set_visible(False)
                 self.phaseModel.set_visible(False)
                 return
-            hlpf = np.divide(1, np.power(np.add(1, np.multiply(1j/self.prop1Value[self.filterIndex], self.f1)), 2))
+            hlpf = None
+            if self.modelState == "H(z)":
+                hlpf = np.divide(1, np.power(np.add(1, np.multiply(self.proc/(2*np.pi*self.prop1Value[self.filterIndex]), np.subtract(1, np.exp(np.multiply(-2*np.pi*1j/self.proc, self.f1))))), 2))
+            elif self.modelState == "H(s)":
+                hlpf = np.divide(1, np.power(np.add(1, np.multiply(1j/self.prop1Value[self.filterIndex], self.f1)), 2))
             hlpf = np.divide(hlpf, np.abs(hlpf[self.normIndex[self.filterIndex]]))
             self.transferModel.set_ydata(abs(hlpf))
             self.phaseModel.set_ydata(np.angle(hlpf))
-        elif self.filterSelect.get() == "Low pass filter 3rd order":
+        elif curFilter == "Low pass filter 3rd order":
             # Catch case of f_c=0
             if self.prop1Value[self.filterIndex] == 0:
                 self.transferModel.set_visible(False)
                 self.phaseModel.set_visible(False)
                 return
-            hlpf = np.divide(1, np.power(np.add(1, np.multiply(1j/self.prop1Value[self.filterIndex], self.f1)), 3))
+            hlpf = None
+            if self.modelState == "H(z)":
+                hlpf = np.divide(1, np.power(np.add(1, np.multiply(self.proc/(2*np.pi*self.prop1Value[self.filterIndex]), np.subtract(1, np.exp(np.multiply(-2*np.pi*1j/self.proc, self.f1))))), 3))
+            elif self.modelState == "H(s)":
+                hlpf = np.divide(1, np.power(np.add(1, np.multiply(1j/self.prop1Value[self.filterIndex], self.f1)), 3))
             hlpf = np.divide(hlpf, np.abs(hlpf[self.normIndex[self.filterIndex]]))
             self.transferModel.set_ydata(abs(hlpf))
             self.phaseModel.set_ydata(np.angle(hlpf))
-        elif self.filterSelect.get() == "Programmable IIR filter":
+        elif curFilter == "Programmable IIR filter":
             self.transferModel.set_visible(False)
             self.phaseModel.set_visible(False)
-        if self.filterSelect.get() != "Programmable IIR filter":
-            if self.showModel.get() == "Enabled":
+        if curFilter != "Programmable IIR filter":
+            if self.modelState != "Disabled":
                 self.transferModel.set_visible(True)
-                if self.showPhase.get() == "Enabled":
+                if self.phaseState == "Enabled":
                     self.phaseModel.set_visible(True)
     
     # Function to check and possibly restore serial connection
@@ -1951,6 +2068,7 @@ class SpectralGUI:
                 values = np.subtract(values, np.average(values))
             # Store the values to the data buffer
             self.data = values
+            # Shift the first value to the end - this is not necessary
             #self.data = self.data[1:len(self.data)] + [self.data[0]]
             #self.data = self.data[1:len(self.data)]
             #self.data = np.pad(self.data, (0, 1))
@@ -2037,7 +2155,7 @@ class SpectralGUI:
                 self.plots += [self.spectrum1]
                 self.plotTitles += [self.window1.get() + " window, ENBW: " + L.fstr(self.enbw1, 3) + "Hz"]
                 # Possibly update phase 1 and add it to the legend
-                if self.showPhase.get() == "Enabled":
+                if self.phaseState == "Enabled":
                     self.phase1.set_ydata(np.divide(self.phase1Pre, self.averaged))
                     self.plots += [self.phase1]
                     self.plotTitles += [self.window1.get() + " window phase"]
@@ -2058,7 +2176,7 @@ class SpectralGUI:
                 self.plots += [self.spectrum2]
                 self.plotTitles += [self.window2.get() + " window, ENBW: " + L.fstr(self.enbw2, 3) + "Hz"]
                 # Possibly update phase 2 and add it to the legend
-                if self.showPhase.get() == "Enabled":
+                if self.phaseState == "Enabled":
                     self.phase2.set_ydata(np.divide(self.phase2Pre, self.averaged))
                     self.plots += [self.phase2]
                     self.plotTitles += [self.window2.get() + " window phase"]
@@ -2066,14 +2184,14 @@ class SpectralGUI:
                 # Add power integrator to the legend
                 self.plots += [self.dots]
                 self.plotTitles += ["Total power in selected band: " + L.fstr(power, 5) + "V$^2$"]
-            if self.transferModel.get_visible():
+            if self.modelState != "Disabled":
                 self.plots += [self.transferModel]
-                self.plotTitles += ["Modeled transfer function"]
-                if self.phaseModel.get_visible():
+                self.plotTitles += ["Modeled transfer function (" + self.modelState + ")"]
+                if self.phaseState != "Disabled":
                     self.plots += [self.phaseModel]
                     self.plotTitles += ["Modeled phase"]
             # Draw the legends
-            if self.showPhase.get() == "Enabled":
+            if self.phaseState == "Enabled":
                 self.legendSpectra = self.ax3.legend(self.plots, self.plotTitles, loc='upper right', title="Averaged spectra: " + L.fstr(self.averaged))
                 # Update the canvas for the phases
                 L.updateCanvas(self.fig2.canvas, self.ax3, False, True)
@@ -2088,7 +2206,8 @@ class SpectralGUI:
         self.busy = False
 
     # Callback for read switch
-    def handle_switchRead(self, event=0):
+    def handle_switchRead(self, event=None):
+        L.pln(self.busy)
         if self.reading:
             self.reading = False
             self.readSwitch['text'] = "Run                "
@@ -2107,19 +2226,19 @@ class SpectralGUI:
         self.window.destroy()
     
     # Callback function for changing the power integrator state to "Disabled"
-    def handle_disablePower(self, event=0):
+    def handle_disablePower(self, event=None):
         self.startFEntry["state"] = DISABLED
         self.endFEntry["state"] = DISABLED
         self.dots.set_visible(False)
 
     # Callback function for changing the power integrator state to "Enabled"
-    def handle_enablePower(self, event=0):
+    def handle_enablePower(self, event=None):
         self.startFEntry["state"] = NORMAL
         self.endFEntry["state"] = NORMAL
         self.dots.set_visible(True)
     
     # Event handler for start frequency entry box
-    def handle_updateStartF(self, event=0):
+    def handle_updateStartF(self, event=None):
         # Check if value is a float
         try:
             newStart = float(self.startFEntry.get())
@@ -2142,7 +2261,7 @@ class SpectralGUI:
         self.dots.set_xdata([self.startF, self.endF])
     
     # Event handler for start frequency entry box
-    def handle_updateEndF(self, event=0):
+    def handle_updateEndF(self, event=None):
         # Check if value is a float
         try:
             newEnd = float(self.endFEntry.get())
