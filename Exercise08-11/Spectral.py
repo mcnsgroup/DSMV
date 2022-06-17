@@ -5,9 +5,12 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 10.06.2022, ver1.18
+# 17.06.2022, ver1.19
 # 
 # Changelog
+#   - 17.06.2022: Added functionality to switch between H(z) and H(s) model for non-FIR filters,
+#                 fixed a bug that caused the normalized spectrum to crash if the selected filter has no index to normalize at,
+#                 optimized startup and reconnect time
 #   - 10.06.2022: Changed data format for saved files from .txt to .csv,
 #                 added x-data to .csv files,
 #                 fixed a bug that caused the data of the time series to be saved instead of that of the spectra,
