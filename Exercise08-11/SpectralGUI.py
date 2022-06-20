@@ -17,12 +17,14 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 17.06.2022, ver1.19
+# 20.06.2022, ver1.20
 # 
 # Changelog
+#   - 20.06.2022: Fixed a bug that caused the arithmetic to not update,
+#                 changed the arithmetic to combobox selector
 #   - 17.06.2022: Added functionality to switch between H(z) and H(s) model for non-FIR filters,
 #                 fixed a bug that caused the normalized spectrum to crash if the selected filter has no index to normalize at,
-#                 #optimized startup and reconnect time
+#                 optimized startup and reconnect time
 #   - 10.06.2022: Changed data format for saved files from .txt to .csv,
 #                 added x-data to .csv files,
 #                 fixed a bug that caused the data of the time series to be saved instead of that of the spectra,
@@ -171,7 +173,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.19")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.20")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -621,8 +623,10 @@ class SpectralGUI:
         self.hzEnabled = [True, True, True, True, True, True, True, True, True, True, False]
         # Array to store wether there is a H(s) to display for the respective filter
         self.hsEnabled = [True, True, True, True, False, False, False, False, True, True, False]
+        # Values for arithmetic
+        self.arithmetics = ["Integer double buffer", "Float double buffer"]
         # Value for arithmetic
-        self.arithmetic = "Integer"
+        self.arithmetic = self.arithmetics[0]
         # String variable for arithmetic
         self.arithmeticV = StringVar()
         self.arithmeticV.set(self.arithmetic)
@@ -630,20 +634,12 @@ class SpectralGUI:
         self.arithmeticLabel = Label(master=self.filterFrame, text="Arithmetic")
         self.uiElements.append(self.arithmeticLabel)
         self.uiGridParams.append([5, 2, 1, 1, "E"])
-        # Create frame for the arithmetic selector
-        self.arithmeticFrame = Frame(master=self.filterFrame)
-        self.uiElements.append(self.arithmeticFrame)
-        self.uiGridParams.append([5, 3, 1, 1, "NESW"])
-        # Create arithmetic selector buttons
-        self.arithmeticIntButton = Radiobutton(self.arithmeticFrame, text="Integer", variable = self.arithmeticV, value="Integer")
-        self.uiElements.append(self.arithmeticIntButton)
-        self.uiGridParams.append([0, 0, 1, 1, "E"])
-        self.arithmeticIntButton.bind("<Button-1>", self.handle_arithmeticInt)
-        self.arithmeticFloatButton = Radiobutton(self.arithmeticFrame, text="Float", variable = self.arithmeticV, value="Float")
-        self.uiElements.append(self.arithmeticFloatButton)
-        self.uiGridParams.append([0, 1, 1, 1, "W"])
-        self.arithmeticFloatButton.bind("<Button-1>", self.handle_arithmeticFloat)
-        
+        # Create combo box for arithmetic selector
+        self.arithmeticSelect = ttk.Combobox(master=self.filterFrame, values = self.arithmetics, state="readonly")
+        self.uiElements.append(self.arithmeticSelect)
+        self.uiGridParams.append([5, 3, 1, 1, "WE"])
+        self.arithmeticSelect.bind("<<ComboboxSelected>>", self.handle_updateArithmetic)
+        self.arithmeticSelect.set(self.arithmetic)
         
         
         # create frame for the run control
@@ -965,6 +961,10 @@ class SpectralGUI:
         self.waitLabel.configure(text=pre + "|")
         self.window.update_idletasks()
         self.handle_updateFilter()
+        time.sleep(0.005)
+        self.waitLabel.configure(text=pre + "/")
+        self.window.update_idletasks()
+        self.handle_updateArithmetic()
         time.sleep(0.005)
         self.waitLabel.grid_forget()
     
@@ -1578,7 +1578,7 @@ class SpectralGUI:
             time.sleep(0.005)
             self.handle_updateProp3(force=True)
             time.sleep(0.005)
-            self.handle_updateProp4(force=True)
+            self.handle_updateWindow(force=True)
     
     # Event handler for filter property 1 entry box
     def handle_updateProp1(self, event=None, force=False, recursive=False, recReact=False, val=None):
@@ -1752,9 +1752,9 @@ class SpectralGUI:
         self.window.update_idletasks()
     
     # Event handler for filter property 4 selector
-    def handle_updateWindow(self, event=None):
+    def handle_updateWindow(self, event=None, force=False):
         self.prop4V.set(self.windowSelect.get())
-        self.handle_updateProp4()
+        self.handle_updateProp4(force)
     
     # Update function for filter property 4
     def handle_updateProp4(self, force=False, recursive=False, recReact=False, val=None):
@@ -1843,22 +1843,13 @@ class SpectralGUI:
         self.modelState = "H(s)"
         self.updateModelState()
     
-    # Function to update the arithmetic and its radiobuttons
-    def updateArithmetic(self):
+    # Event handler for arithmetic selector
+    def handle_updateArithmetic(self, event=None):
         # Set string variable
-        self.arithmeticV.set(self.arithmetic)
+        self.arithmeticV.set(self.arithmeticSelect.get())
+        self.arithmetic = self.arithmeticV.get()
         # Write command to serial port
         self.port.writeL("set arithmetic " + self.arithmetic)
-    
-    # Callback function for changing the arithmetic to "Integer"
-    def handle_arithmeticInt(self, event=None):
-        self.arithmetic = "Integer"
-        self.updateArithmetic()
-    
-    # Callback function for changing the arithmetic to "Float"
-    def handle_arithmeticFloat(self, event=None):
-        self.arithmetic = "Float"
-        self.updateArithmetic()
     
     # Function to draw the modelled transfer function and phase
     def drawModelCurve(self):
@@ -2207,7 +2198,6 @@ class SpectralGUI:
 
     # Callback for read switch
     def handle_switchRead(self, event=None):
-        L.pln(self.busy)
         if self.reading:
             self.reading = False
             self.readSwitch['text'] = "Run                "
