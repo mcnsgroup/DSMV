@@ -5,9 +5,11 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 17.06.2022, ver1.19
+# 20.06.2022, ver1.20
 # 
 # Changelog
+#   - 20.06.2022: Fixed a bug that caused the arithmetic to not update,
+#                 changed the arithmetic to combobox selector
 #   - 17.06.2022: Added functionality to switch between H(z) and H(s) model for non-FIR filters,
 #                 fixed a bug that caused the normalized spectrum to crash if the selected filter has no index to normalize at,
 #                 optimized startup and reconnect time
