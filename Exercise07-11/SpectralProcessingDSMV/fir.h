@@ -126,8 +126,29 @@ void init_fir(uint8_t type, float props[]) {
 
 /** @brief Implements a FIR filter
  *  
+ *  There are mutliple optimizations to be considered for this filter.
+ *  When acessing and processing the input values and filter coefficients, 
+ *  one can choose between integer and float arithmetic.
+ *  Moreover, the data buffer can be acessed as a ring buffer using modulo,
+ *  using an if-comparator or using a double-sized buffer.
+ *  For testing which method is the fastest, the following settings were used with a bandpass filter:
+ *    f_p = 80000Hz
+ *    N = 1000
+ *    f_low = 2000
+ *    f_high = 4000
+ *    Nfilter = 140
+ *  The results were as follows:
+ *  Integer arithmetic:
+ *    Modulo        3.27µs
+ *    If            1.96µs
+ *    double buffer (1.02 + 0.8)µs / 2, for some reason this is sometimes faster and sometimes slower
+ *  Float arithmetic:
+ *    Modulo        3.95µs
+ *    If            1.71µs
+ *    double buffer 1.7µs
+ *  
  *  @param xn analog input value (V)
- +  @param xnRaw raw analog input value
+ *  @param xnRaw raw analog input value
  *  @param props standardized properties array with the following order:		
  *      props[2] holds the filter order
  *      props[4] holds the arithmetic, currently supported are:
@@ -152,7 +173,7 @@ float proc_fir(float xn, int32_t xnRaw, float props[]) {
   int32_t filteredInt = 0;
   switch((int) props[4]) {
     case integerArithmetic: // Measure timing
-    						//T4toggle(LED_3);
+    						            //T4toggle(LED_3);
                             for(int i = 0; i < Nfilter; i++) {
                               // Computation using if based modulo
                               /*if(fir_bufPos + i >= Nfilter) {
@@ -173,7 +194,7 @@ float proc_fir(float xn, int32_t xnRaw, float props[]) {
                             filtered = filtered * gainLTC2500 + offsetLTC2500;
                             break;
     case floatArithmetic:   // Measure timing
-    						//T4toggle(LED_3);
+    						            //T4toggle(LED_3);
                             for(int i = 0; i < Nfilter; i++) {
                               // Computation using if based modulo
                               /*if(fir_bufPos + i >= Nfilter) {
