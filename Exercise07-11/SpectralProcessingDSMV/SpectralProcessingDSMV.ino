@@ -7,21 +7,20 @@
  *  
  *  @author Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
  *  @author Philipp Rahe (prahe@uos.de)
- *  @date 08.06.2022
- *  @version 1.5.3
+ *  @date 17.06.2022
+ *  @version 1.6
  *  
  *  @par Changelog
  *  - 17.06.2022: Added functionality to configure FIR filter arithmetic via USB command,
  *                significantly improved the performance of FIR filters,
- *                #moved all filters to external files
+ *                moved all filters to external files
  *  - 08.06.2022: Fixed a bug that caused the FIR filter to not be recalculated on a property update
  *  - 07.06.2022: Changed maximum cycle length for impulse response mode to match maximum data size even for step response,
  *                added option to configure filter window via USB protocol,
  *                fixed a bug that caused the filter properties to not be updated properly for FIR filters
  *  - 03.06.2022: Changed spectral reading to occur in tandem with filter processing
  *                while not in spectral operation mode
- *  - 02.06.2022: Fixed a bug that caused the one-parameter filters 
- *                to not work properly after a property update,
+ *  - 02.06.2022: Fixed a bug that caused the one-parameter filters to not work properly after a property update,
  *                merged features with ImpulseProcessingDSMV
  *  - 31.05.2022: Added functionality to configure filters via USB protocol,
  *                moved different filters to individual files,
