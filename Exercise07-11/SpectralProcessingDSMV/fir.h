@@ -187,7 +187,7 @@ float proc_fir(float xn, int32_t xnRaw, float props[]) {
                             }
                             T4toggle(LED_3);
                             // Shift by factor of the coefficient array
-                            filtered = filteredInt >> coeffPrec;
+                            filtered = filteredInt >> 7;
                             // Convert into a voltage
                             filtered = RES_LTC2500 * filtered; 
                             // Offset/gain correction
