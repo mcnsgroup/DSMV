@@ -1,5 +1,10 @@
-# Version 0.2.18
+# 21.06.2022, Version 0.2.20
 # Changelog
+#	- 21.06.2022: Added functionality to save the data of a figure as a .csv file,
+#				  added functionality to get all visible plots (lines) from an axis,
+#				  added functionality to create a data tip for all plots of an axis,
+#				  fixed a bug that caused the save path to crash if non integer values were present in the file name
+#	- 13.06.2022: Added functionality to save the data of a plot as a .csv file
 #	- 08.06.2022: Fixed a bug in logarithmic axis scaling,
 #				  fixed a bug in number formating for Inf and NaN values,
 #				  fixed a bug that caused the y-axis to not take into account all visible plots
@@ -175,11 +180,10 @@ class dataTip:
 	# 
 	# @param canvas Canvas to bind data tip to
 	# @param ax Axis on the canvas to bind data tip to
-	# @param line Plot in the axis to bind data tip to
 	# @param dist Maximum distance from plot data to recognize a click as plot size fraction
+	# @param line Plot in the axis to bind data tip to (if none is given, the data tip will work on all plots within the axis instead)
 	# @param faceColor Background color of the annotation
-	# @param textColor Text color of the annotation
-	def __init__(self, canvas, ax, line, dist, faceColor="w"):
+	def __init__(self, canvas, ax, dist, line=None, faceColor="w"):
 		# Initialize variables
 		self.canvas = canvas
 		self.ax = ax
@@ -231,14 +235,35 @@ class dataTip:
 				yL = self.ax.get_ylim()
 				xSpan = xL[1] - xL[0]
 				ySpan = yL[1] - yL[0]
-				xData = self.line.get_xdata()
-				yData = self.line.get_ydata()
 				widget = self.canvas.get_tk_widget()
 				sizeFac = widget.winfo_height() / widget.winfo_width()
-				index = closestPoint([event.xdata, event.ydata], [xData, yData], [self.dist*xSpan, self.dist*ySpan/sizeFac])
-				if index != None:
-					self.x1, self.y1 = self.line.get_xdata()[index], self.line.get_ydata()[index]
-					self.drawAnnotation()
+				if self.line != None:
+					xData = self.line.get_xdata()
+					yData = self.line.get_ydata()
+					index = closestPoint([event.xdata, event.ydata], [xData, yData], [self.dist*xSpan, self.dist*ySpan/sizeFac])
+					if index != None:
+						self.x1, self.y1 = xData[index], yData[index]
+						self.drawAnnotation()
+				else:
+					lines = getVisiblePlots(self.ax)
+					xy = []
+					for line in lines:
+						xData = line.get_xdata()
+						yData = line.get_ydata()
+						index = closestPoint([event.xdata, event.ydata], [xData, yData], [self.dist*xSpan, self.dist*ySpan/sizeFac])
+						if index != None:
+							xy += [[xData[index], yData[index]]]
+					if len(xy) > 0:
+						closest = distanceSum([event.xdata, event.ydata], xy[0], [self.dist*xSpan, self.dist*ySpan/sizeFac])
+						self.x1, self.y1 = xy[0]
+						for coords in xy:
+							pointDist = distanceSum([event.xdata, event.ydata], coords, [self.dist*xSpan, self.dist*ySpan/sizeFac])
+							if pointDist < closest:
+								closest = pointDist
+								self.x1, self.y1 = coords
+						self.drawAnnotation()
+
+
 			updateCanvas(self.canvas, self.ax, False, True)
 
 # Converts a string into a float (if possible) with respect to German point notation
@@ -261,21 +286,84 @@ def toFloat(a):
 # @param name Base name of the file.
 # @param dir Directory to place the file in, relative to the working directory.
 def savePath(name, dir):
-    # get all previously saved files
-    files=glob.glob(dir + name + " *.*")
-    # get highest number of a file
-    FilesMax = 0
-    if len(files) > 0:
-        # calculate number of characters before enumeration
-        numStart = len(dir + name + " ")
-        # calculate number of characters after enumeration
-        numCrop = len(files[0]) - files[0].rindex(".")
-        for f in files:
-        	fNum = f[numStart:-numCrop]
-        	if int(fNum) > FilesMax:
-        		FilesMax = int(fNum)
-    # Return String to save file
-    return dir + name + " " + str(FilesMax + 1)
+	# get all previously saved files
+	files=glob.glob(dir + name + " *.*")
+	# get highest number of a file
+	FilesMax = 0
+	if len(files) > 0:
+		# calculate number of characters before enumeration
+		numStart = len(dir + name + " ")
+		# calculate number of characters after enumeration
+		numCrop = len(files[0]) - files[0].rindex(".")
+		for f in files:
+			fNum = f[numStart:-numCrop]
+			if not fNum.isdigit():
+				continue
+			if int(fNum) > FilesMax:
+				FilesMax = int(fNum)
+	# Return String to save file
+	return dir + name + " " + str(FilesMax + 1)
+
+# Gets all visible plots of an axis.
+# 
+# @param ax Axis to get plots from.
+# @return List with all visible plots.
+def getVisiblePlots(ax):
+	# get all lines on the axis
+	allLines = ax.lines
+	# list to hold only visible lines
+	lines = []
+	# only consider lines that are visible
+	for line in allLines:
+		if line.get_visible():
+			lines.append(line)
+	return lines
+
+# Saves the data of a plot to a .csv file.
+# 
+# @param plot Plot to be saved.
+# @param path Path to save the file to (without file extension).
+def savePlotCSV(plot, path):
+	f = open(path + ".csv", mode = "w")
+	savedataX = plot.get_xdata()
+	savedataY = plot.get_ydata()
+	if type(savedataX) != list:
+		savedataX = savedataX.tolist()
+	if type(savedataY) != list:
+		savedataY = savedataY.tolist()
+	savedataX = str(savedataX)
+	savedataY = str(savedataY)
+	savedata = savedataX[1:len(savedataX)-1] + "\n" + savedataY[1:len(savedataY)-1]
+	f.write(savedata)
+	f.close
+
+# Saves the data of a figure to a .csv file.
+# 
+# The individual axes are separated by two empty lines,
+# the plots within each axis are separated by one empty line.
+# 
+# @param fig Figure to be saved.
+# @param path Path to save the file to (without file extension).
+def saveFigCSV(fig, path):
+	f = open(path + ".csv", mode = "w")
+	# get all axes of the figure
+	allAx = fig.axes
+	for ax in allAx:
+		# get all visible lines on the axis
+		lines = getVisiblePlots(ax)
+		for plot in lines:
+			savedataX = plot.get_xdata()
+			savedataY = plot.get_ydata()
+			if type(savedataX) != list:
+				savedataX = savedataX.tolist()
+			if type(savedataY) != list:
+				savedataY = savedataY.tolist()
+			savedataX = str(savedataX)
+			savedataY = str(savedataY)
+			savedata = savedataX[1:len(savedataX)-1] + "\n" + savedataY[1:len(savedataY)-1] + "\n\n"
+			f.write(savedata)
+		f.write("\n")
+	f.close
 
 # Window to bind events to
 window = None
@@ -288,14 +376,8 @@ window = None
 def rescaleAx(ax, rescaleX=True, rescaleY=True):
 	if not (rescaleX or rescaleY):
 		return
-	# get all lines on the axis
-	allLines = ax.lines
-	# list to hold only visible lines
-	lines = []
-	# only consider lines that are visible
-	for line in allLines:
-		if line.get_visible():
-			lines.append(line)
+	# list to hold visible lines
+	lines = getVisiblePlots(ax)
 	if len(lines) == 0:
 		return
 	if rescaleX:
@@ -410,142 +492,146 @@ class VerticalPlotToolbar(NavigationToolbar2Tk):
 #   - Currently only supports one serial port open at a time!
 #   - Since this port is threaded, it doesn't provide functionality for reading with a timeout!
 class sPort(Protocol):
-    # Nested class for internal buffer and port
-    class Buffer:
-        port = None
-        content = bytes(0)
-        size = 4096
-        disconnected = False
-        dummyFig = fig.Figure()
-    
-    buffer = Buffer()
+	# Nested class for internal buffer and port
+	class Buffer:
+		port = None
+		content = bytes(0)
+		size = 4096
+		disconnected = False
+		dummyFig = fig.Figure()
 
-    # Placeholder function to be called when data has been read
-    def dummy(self):
-        pass
+	buffer = Buffer()
 
-    handleData = dummy
+	# Placeholder function to be called when data has been read
+	def dummy(self):
+		pass
 
-    # Constructor method
-    def __init__(self, name="Auto"):
-        # Create serial port
-        self.buffer.port = self.serPort(name)
-    
-    # Initializes a serial port
-    # name is the name of the port
-    def serPort(self, name):
-        try:
-            if name == "Auto":
-                ports=serial.tools.list_ports.comports()
-                if len(ports) > 1:
-                    name = "/dev/" + ports[1].name
-            port = serial.Serial(name)
-            return port
-        except serial.serialutil.SerialException:
-            pln("Could not open the serial port! Try un- and replugging the device or providing the correct port name.")
-            raise SerialDisconnect
+	handleData = dummy
 
-    # Method start the thread (can't be in the constructor)
-    def start(self, maxSize=4096, handleFunc=None):
-        # Store function to be called when data is read
-        if handleFunc != None:
-            sPort.handleData = handleFunc
-        # Set the maximum buffer size
-        self.buffer.size = maxSize
-        # Add a canvas to the dummy figure
-        FigureCanvasTkAgg(self.buffer.dummyFig)
-        # Initialize reading thread
-        self.reader = ReaderThread(self.buffer.port, sPort)
-        # Start reading thread
-        self.reader.start()
-    
-    # Callback function to store read data to the internal buffer and possibly do externally configured tasks
-    def readStoreBuffer(self, data):
-        # Write data to internal buffer if it fits (discard it otherwise)
-        if len(self.buffer.content) + len(data) <= self.buffer.size:
-            self.buffer.content += data
-        self.handleData()
+	# Constructor method
+	def __init__(self, name="Auto"):
+		# Create serial port
+		self.buffer.port = self.serPort(name)
 
-    # Clear the internal buffer
-    def clearBuffer(self, clearLine=False):
-        # Flush events
-        self.buffer.dummyFig.canvas.flush_events()
-        # Update the GUI
-        window.update_idletasks()
-        if clearLine:
-            # Empty the buffer up to the last newline character
-            numBytes = len(self.buffer.content)
-            for newLineIndex in range(numBytes-1, -1, -1):
-                if chr(self.buffer.content[newLineIndex]) == "\n":
-                    self.buffer.content = self.buffer.content[newLineIndex+1:len(self.buffer.content)]
-                    break
-        else:
-            # empty the buffer
-            self.buffer.content = bytes(0)
+	# Initializes a serial port
+	# name is the name of the port
+	def serPort(self, name):
+		try:
+			if name == "Auto":
+				ports=serial.tools.list_ports.comports()
+				if len(ports) > 1:
+					name = "/dev/" + ports[1].name
+			port = serial.Serial(name)
+			return port
+		except serial.serialutil.SerialException:
+			pln("Could not open the serial port! Try un- and replugging the device or providing the correct port name.")
+			raise SerialDisconnect
 
-    def connection_made(self, transport):
-        """Called when reader thread is started"""
-        pass
-        #print("Connected, ready to receive data...")
+	# Method start the thread (can't be in the constructor)
+	def start(self, maxSize=4096, handleFunc=None):
+		# Store function to be called when data is read
+		if handleFunc != None:
+			sPort.handleData = handleFunc
+		# Set the maximum buffer size
+		self.buffer.size = maxSize
+		# Add a canvas to the dummy figure
+		FigureCanvasTkAgg(self.buffer.dummyFig)
+		# Initialize reading thread
+		self.reader = ReaderThread(self.buffer.port, sPort)
+		# Start reading thread
+		self.reader.start()
 
-    def data_received(self, data):
-        """Called with snippets received from the serial port"""
-        window.after(0, self.readStoreBuffer, data)
+	# Callback function to store read data to the internal buffer and possibly do externally configured tasks
+	def readStoreBuffer(self, data):
+		# Write data to internal buffer if it fits (discard it otherwise)
+		if len(self.buffer.content) + len(data) <= self.buffer.size:
+			self.buffer.content += data
+		self.handleData()
 
-    def reopen(self):
-        newPort = None
-        try:
-            # Get available ports
-            ports=serial.tools.list_ports.comports()
-            if len(ports) > 1:
-                newPort = Serial("/dev/" + ports[1].name)
-        except serial.serialutil.SerialException:
-            pass
-        if newPort != None:
-            self.buffer.port = newPort
-            self.buffer.disconnected = False
-            newReader = ReaderThread(self.buffer.port, sPort)
-            newReader.start()
-        else:
-            window.after(1, self.reopen)
+	# Clear the internal buffer
+	def clearBuffer(self, clearLine=False):
+		# Flush events
+		self.buffer.dummyFig.canvas.flush_events()
+		# Update the GUI
+		window.update_idletasks()
+		if clearLine:
+			# Empty the buffer up to the last newline character
+			numBytes = len(self.buffer.content)
+			for newLineIndex in range(numBytes-1, -1, -1):
+				if chr(self.buffer.content[newLineIndex]) == "\n":
+					self.buffer.content = self.buffer.content[newLineIndex+1:len(self.buffer.content)]
+					break
+		else:
+			# empty the buffer
+			self.buffer.content = bytes(0)
 
-    def connection_lost(self, exc=None):
-        pln("Serial port disconnected. Trying to reconnect...")
-        self.reopen()
-        self.buffer.disconnected = True
-    
-    # Returns wether the port is disconnected
-    def disconnected(self):
-        return self.buffer.disconnected
+	def connection_made(self, transport):
+		"""Called when reader thread is started"""
+		pass
+		#print("Connected, ready to receive data...")
 
-    # Reads a specified number of bytes (1 if no parameter is given) from the wrapped serial port (if there is data available), 
-    # removes it from the buffer and returns it
-    def readB(self, bytes=1):
-        numBytes = len(self.buffer.content)
-        if numBytes < bytes:
-            return "not enough data"
-        retVal = self.buffer.content[0:bytes]
-        self.buffer.content = self.buffer.content[bytes:len(self.buffer.content)]
-        return retVal
+	def data_received(self, data):
+		"""Called with snippets received from the serial port"""
+		window.after(0, self.readStoreBuffer, data)
 
-    # Reads a line from the wrapped serial port (if there is one available), 
-    # removes it from the buffer and returns it as a string (without the newline character at the end).
-    def readL(self, forceWait=True):
-        numBytes = len(self.buffer.content)
-        newLineIndex = 0
-        for newLineIndex in range(numBytes):
-            if chr(self.buffer.content[newLineIndex]) == "\n":
-                try:
-                    retVal = self.buffer.content[0:newLineIndex].decode()
-                except UnicodeDecodeError:
-                    retVal = "Read data isn't a string"
-                self.buffer.content = self.buffer.content[newLineIndex+1:len(self.buffer.content)]
-                return retVal
-        return "not enough data"
-    
-    # Writes a line to the wrapped serial port.
-    def writeL(self, s):
-        try:
-            self.buffer.port.write((s + '\n').encode())
-        except OSError:
-            raise SerialDisconnect
+	def reopen(self):
+		newPort = None
+		try:
+			# Get available ports
+			ports=serial.tools.list_ports.comports()
+			if len(ports) > 1:
+				newPort = Serial("/dev/" + ports[1].name)
+		except serial.serialutil.SerialException:
+			pass
+		if newPort != None:
+			self.buffer.port = newPort
+			self.buffer.disconnected = False
+			newReader = ReaderThread(self.buffer.port, sPort)
+			newReader.start()
+		else:
+			window.after(1, self.reopen)
+
+	def connection_lost(self, exc=None):
+		pln("Serial port disconnected. Trying to reconnect...")
+		self.reopen()
+		self.buffer.disconnected = True
+
+	# Returns wether the port is disconnected
+	def disconnected(self):
+		return self.buffer.disconnected
+
+	# Reads a specified number of bytes (1 if no parameter is given) from the wrapped serial port (if there is data available), 
+	# removes it from the buffer and returns it
+	def readB(self, bytes=1):
+		numBytes = len(self.buffer.content)
+		if numBytes < bytes:
+			return "not enough data"
+		retVal = self.buffer.content[0:bytes]
+		self.buffer.content = self.buffer.content[bytes:len(self.buffer.content)]
+		return retVal
+
+	# Reads a line from the wrapped serial port (if there is one available), 
+	# removes it from the buffer and returns it as a string (without the newline character at the end).
+	def readL(self, forceWait=True):
+		numBytes = len(self.buffer.content)
+		newLineIndex = 0
+		for newLineIndex in range(numBytes):
+			if chr(self.buffer.content[newLineIndex]) == "\n":
+				try:
+					retVal = self.buffer.content[0:newLineIndex].decode()
+				except UnicodeDecodeError:
+					retVal = "Read data isn't a string"
+				self.buffer.content = self.buffer.content[newLineIndex+1:len(self.buffer.content)]
+				return retVal
+		return "not enough data"
+
+	# Writes a line to the wrapped serial port.
+	def writeL(self, s):
+		if self.buffer.disconnected:
+			pln("Where are you tryinng to write to? The port is closed!")
+			return
+		try:
+			self.buffer.port.write((s + '\n').encode())
+		except OSError:
+			pln("Error in writing")
+			raise SerialDisconnect
