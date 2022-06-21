@@ -4,9 +4,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 10.05.2022, ver1.7
+# 21.06.2022, ver1.8
 # 
 # Changelog
+#   - 21.06.2022: Update to maintain compatibility with newer version of DSMVLib module
 #   - 10.05.2022: Added functionality to display the values of a point clicked on the plots
 #   - 03.05.2022: Moved entry box processing to DSMVLib module,
 #                 greatly improved performance of histograms
@@ -61,13 +62,11 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 # Import official modules
-from turtle import st
 import numpy as np
 from matplotlib import *
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tkinter import *
-from PIL import Image, ImageTk
 import os
 # Import custom module
 from DSMVLib import DSMVLib as L
@@ -123,7 +122,7 @@ class RTDTempGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 03\nv1.7")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 03\nv1.8")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -388,7 +387,7 @@ class RTDTempGUI:
         self.uiElements.append(canvas1.get_tk_widget())
         self.uiGridParams.append([1, 0, 1, 2, "NESW"])
         # Create data tip for canvas 1
-        self.dataTip1 = L.dataTip(canvas1, self.ax1, self.line1, 0.01)
+        self.dataTip1 = L.dataTip(canvas1, self.ax1, 0.01, self.line1)
         # Create frame for saving the plot
         self.saveFrame1 = Frame()
         self.uiElements.append(self.saveFrame1)
@@ -434,7 +433,7 @@ class RTDTempGUI:
         self.uiElements.append(canvas2.get_tk_widget())
         self.uiGridParams.append([2, 0, 1, 2, "NESW"])
         # Create data tip for canvas 2
-        self.dataTip2 = L.dataTip(canvas2, self.ax2, self.line2, 0.01)
+        self.dataTip2 = L.dataTip(canvas2, self.ax2, 0.01, self.line2)
         # Create frame for saving the plot
         self.saveFrame2 = Frame()
         self.uiElements.append(self.saveFrame2)
