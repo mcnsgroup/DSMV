@@ -4,9 +4,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 23.05.2022, ver1.10
+# 21.06.2022, ver1.11
 # 
 # Changelog
+#   - 21.06.2022: Update to maintain compatibility with newer version of DSMVLib module
 #   - 23.05.2022: Update to maintain compatibility with newer version of Arduino program,
 #                 fixed a bug that caused the serial connection to not be monitored at the beginning,
 #                 fixed a bug that falsely caused the reading to start after a serial reconnect
@@ -55,7 +56,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 # Import official modules
-from cProfile import label
 import numpy as np
 from matplotlib.pyplot import *
 from matplotlib.figure import Figure
@@ -104,7 +104,7 @@ class DisplayDSMVGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 04\nv1.10")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 04\nv1.11")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -338,7 +338,7 @@ class DisplayDSMVGUI:
         self.uiElements.append(canvas1.get_tk_widget())
         self.uiGridParams.append([1, 0, 1, 2, "NESW"])
         # Create data tip for canvas 1
-        self.dataTip1 = L.dataTip(canvas1, self.ax1, self.line1, 0.01)
+        self.dataTip1 = L.dataTip(canvas1, self.ax1, 0.01, self.line1)
         # Create frame for saving the plot
         self.saveFrame1 = Frame()
         self.uiElements.append(self.saveFrame1)
@@ -384,7 +384,7 @@ class DisplayDSMVGUI:
         self.uiElements.append(canvas2.get_tk_widget())
         self.uiGridParams.append([2, 0, 1, 2, "NESW"])
         # Create data tip for canvas 1
-        self.dataTip2 = L.dataTip(canvas2, self.ax2, self.line2, 0.01)
+        self.dataTip2 = L.dataTip(canvas2, self.ax2, 0.01, self.line2)
         # Create frame for saving the plot
         self.saveFrame2 = Frame()
         self.uiElements.append(self.saveFrame2)
@@ -430,7 +430,7 @@ class DisplayDSMVGUI:
         self.uiElements.append(canvas3.get_tk_widget())
         self.uiGridParams.append([3, 0, 1, 2, "NESW"])
         # Create data tip for canvas 3
-        self.dataTip3 = L.dataTip(canvas3, self.ax3, self.line3, 0.01)
+        self.dataTip3 = L.dataTip(canvas3, self.ax3, 0.01, self.line3)
         # Create frame for saving the plot
         self.saveFrame3 = Frame()
         self.uiElements.append(self.saveFrame3)
