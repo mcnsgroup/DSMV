@@ -17,9 +17,15 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 20.06.2022, ver1.20
+# 21.06.2022, ver1.21
 # 
 # Changelog
+#   - 21.06.2022: Added arithmetic options for different handlings of modulo,
+#                 changed data tips for spectra to entire axis data tip,
+#                 fixed a bug that caused the model state buttons to still trigger if disabled,
+#                 fixed a bug that caused the model state buttons to not be disabled and enabled when appropriate,
+#                 fixed a bug that caused the second spectrum to be displayed when not in spectal mode,
+#                 fixed a bug that caused the filter order to accept odd numbers
 #   - 20.06.2022: Fixed a bug that caused the arithmetic to not update,
 #                 changed the arithmetic to combobox selector
 #   - 17.06.2022: Added functionality to switch between H(z) and H(s) model for non-FIR filters,
@@ -173,7 +179,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.20")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.21")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -458,11 +464,6 @@ class SpectralGUI:
         self.uiElements.append(self.phaseEnButton)
         self.uiGridParams.append([0, 1, 1, 1, "W"])
         self.phaseEnButton.bind("<Button-1>", self.handle_phaseEn)
-        
-        
-        
-        
-        
         # Create frame for the filter settings
         self.filterFrame = Frame(master=self.tabsystem)
         self.tabsystem.add(self.filterFrame, text='Filter settings')
@@ -624,7 +625,7 @@ class SpectralGUI:
         # Array to store wether there is a H(s) to display for the respective filter
         self.hsEnabled = [True, True, True, True, False, False, False, False, True, True, False]
         # Values for arithmetic
-        self.arithmetics = ["Integer double buffer", "Float double buffer"]
+        self.arithmetics = ["Integer double buffer", "Integer if modulo", "Integer modulo", "Float double buffer", "Float if modulo", "Float modulo"]
         # Value for arithmetic
         self.arithmetic = self.arithmetics[0]
         # String variable for arithmetic
@@ -640,8 +641,6 @@ class SpectralGUI:
         self.uiGridParams.append([5, 3, 1, 1, "WE"])
         self.arithmeticSelect.bind("<<ComboboxSelected>>", self.handle_updateArithmetic)
         self.arithmeticSelect.set(self.arithmetic)
-        
-        
         # create frame for the run control
         self.runFrame = Frame(master=self.controlFrame, relief=RIDGE, borderwidth=2)
         self.uiElements.append(self.runFrame)
@@ -697,7 +696,7 @@ class SpectralGUI:
         self.uiElements.append(canvas1.get_tk_widget())
         self.uiGridParams.append([1, 0, 1, 2, "NESW"])
         # Create data tip for the voltage
-        self.dataTipVoltage = L.dataTip(canvas1, self.ax1, self.voltage, 0.01, "b")
+        self.dataTipVoltage = L.dataTip(canvas1, self.ax1, 0.01, self.voltage, "b")
         # Create frame for saving the plot
         self.saveFrame1 = Frame()
         self.uiElements.append(self.saveFrame1)
@@ -715,7 +714,7 @@ class SpectralGUI:
             # save the image
             self.fig1.savefig(path + ".svg")
             # save the data as csv file
-            L.savePlotCSV(self.voltage, path)
+            L.saveFigCSV(self.fig1, path)
             # display the saved message
             self.saveLabel1.configure(text="Saved as " + path + "!")
             # schedule message removal
@@ -821,10 +820,12 @@ class SpectralGUI:
         canvas2.draw()
         self.uiElements.append(canvas2.get_tk_widget())
         self.uiGridParams.append([2, 0, 1, 2, "NESW"])
+        # Create data tip for spectra
+        self.dataTipSpectra = L.dataTip(canvas2, self.ax2, 0.01)
         # Create data tip for spectrum 1
-        self.dataTipSpectrum1 = L.dataTip(canvas2, self.ax2, self.spectrum1, 0.01, "b")
+        #self.dataTipSpectrum1 = L.dataTip(canvas2, self.ax2, self.spectrum1, 0.01, "b")
         # Create data tip for spectrum 2
-        self.dataTipSpectrum2 = L.dataTip(canvas2, self.ax2, self.spectrum2, 0.01, "r")
+        #self.dataTipSpectrum2 = L.dataTip(canvas2, self.ax2, self.spectrum2, 0.01, "r")
         # Create frame for saving the plot
         self.saveFrame2 = Frame()
         self.uiElements.append(self.saveFrame2)
@@ -842,8 +843,7 @@ class SpectralGUI:
             # save the image
             self.fig2.savefig(path + ".svg")
             # save the data of spectra as csv file
-            L.savePlotCSV(self.spectrum1, path + "_1")
-            L.savePlotCSV(self.spectrum2, path + "_2")
+            L.saveFigCSV(self.fig2, path)
             # display the saved message
             self.saveLabel2.configure(text="Saved as " + path + "!")
             # schedule message removal
@@ -986,11 +986,11 @@ class SpectralGUI:
             # Update the mode
             self.mode = newMode
             self.port.writeL('deactivate AD4020')
-            time.sleep(0.1)
+            time.sleep(0.01)
             self.port.writeL('deactivate LTC2500')
-            time.sleep(0.1)
+            time.sleep(0.01)
             self.port.writeL('deactivate Internal ADC')
-            time.sleep(0.1)
+            time.sleep(0.01)
             if self.mode == "AD4020 spectral analysis":
                 self.ax1.set_ylabel("Voltage AD4020 (V)")
                 self.spectral = True
@@ -1008,13 +1008,15 @@ class SpectralGUI:
                 self.handle_updateFreq()
                 self.freqEntry["state"] = DISABLED
                 self.windowSelect1.set("Rectangle")
+                self.windowSelect2.set("Disabled")
                 self.handle_updateWindow1()
+                self.handle_updateWindow2()
                 self.windowSelect1["state"] = DISABLED
                 self.windowSelect2["state"] = DISABLED
-                self.modelDisButton["state"] = NORMAL
-                self.modelHzButton["state"] = NORMAL
-                self.modelHsButton["state"] = NORMAL
                 self.spectral = False
+                # Enable model buttons as appropriate
+                self.handle_updateFilter()
+                self.modelDisButton["state"] = NORMAL
                 self.unitSelect.set("Normalized Spectrum")
                 self.handle_updateUnit()
                 # Update frequency indices in power integrator
@@ -1305,12 +1307,18 @@ class SpectralGUI:
     
     # Callback function for changing the y-scale to "Logarithmic"
     def handle_logScale(self, event):
+        # Don't change state if button is disabled
+        if self.logButton["state"] == DISABLED:
+            return
         self.ax2.set_yscale("log")
         # Update the canvas for the spectra
         L.updateCanvas(self.fig2.canvas, self.ax2, False, True)
 
     # Callback function for changing the y-scale to "Linear"
     def handle_linScale(self, event):
+        # Don't change state if button is disabled
+        if self.linButton["state"] == DISABLED:
+            return
         self.ax2.set_yscale("linear")
         # Update the canvas for the spectra
         L.updateCanvas(self.fig2.canvas, self.ax2, False, True)
@@ -1322,13 +1330,13 @@ class SpectralGUI:
             if self.phaseState == "Enabled":
                 self.phase1.set_visible(False)
             self.maxAnnotation1.set_visible(False)
-            self.dataTipSpectrum1.setState(DISABLED)
+            #self.dataTipSpectrum1.setState(DISABLED)
         else:
             self.spectrum1.set_visible(True)
             if self.phaseState == "Enabled":
                 self.phase1.set_visible(True)
             self.maxAnnotation1.set_visible(True)
-            self.dataTipSpectrum1.setState(NORMAL)
+            #self.dataTipSpectrum1.setState(NORMAL)
             self.winFunc1 = "Window" + self.window1.get() + "." + "Window" + self.window1.get()
             self.resetYSpectra()
     
@@ -1339,13 +1347,13 @@ class SpectralGUI:
             if self.phaseState == "Enabled":
                 self.phase2.set_visible(False)
             self.maxAnnotation2.set_visible(False)
-            self.dataTipSpectrum2.setState(DISABLED)
+            #self.dataTipSpectrum2.setState(DISABLED)
         else:
             self.spectrum2.set_visible(True)
             if self.phaseState == "Enabled":
                 self.phase2.set_visible(True)
             self.maxAnnotation2.set_visible(True)
-            self.dataTipSpectrum2.setState(NORMAL)
+            #self.dataTipSpectrum2.setState(NORMAL)
             self.winFunc2 = "Window" + self.window2.get() + "." + "Window" + self.window2.get()
             self.resetYSpectra()
     
@@ -1379,6 +1387,9 @@ class SpectralGUI:
     
     # Callback function for changing the subtraction to "Disabled"
     def handle_subDis(self, event):
+        # Don't change state if button is disabled
+        if self.subDisButton["state"] == DISABLED:
+            return
         self.subtract.set("Disabled")
         # Update the axes
         self.updateAxes()
@@ -1388,6 +1399,9 @@ class SpectralGUI:
     
     # Callback function for changing the subtraction to "Enabled"
     def handle_subEn(self, event):
+        # Don't change state if button is disabled
+        if self.subEnButton["state"] == DISABLED:
+            return
         self.subtract.set("Enabled")
         # Update the axes
         self.updateAxes()
@@ -1397,6 +1411,9 @@ class SpectralGUI:
     
     # Callback function for changing the phase to "Disabled"
     def handle_phaseDis(self, event=None):
+        # Don't change state if button is disabled
+        if self.phaseDisButton["state"] == DISABLED:
+            return
         self.phaseState = "Disabled"
         self.phaseStateV.set(self.phaseState)
         # Hide phases
@@ -1407,6 +1424,9 @@ class SpectralGUI:
     
     # Callback function for changing the phase to "Enabled"
     def handle_phaseEn(self, event):
+        # Don't change state if button is disabled
+        if self.phaseEnButton["state"] == DISABLED:
+            return
         self.phaseState  = "Enabled"
         self.phaseStateV.set(self.phaseState)
         # Display phases
@@ -1477,12 +1497,18 @@ class SpectralGUI:
     
     # Callback function for changing the y-scale to "Logarithmic"
     def handle_customTransform(self, event):
+        # Don't change state if button is disabled
+        if self.N_FTButton["state"] == DISABLED:
+            return
         self.transformSize1Entry["state"] = NORMAL
         self.transformSize2Entry["state"] = NORMAL
         self.transformSizeStatus.set("N_FT-1")
 
     # Callback function for changing the y-scale to "Linear"
     def handle_lockedTransform(self, event):
+        # Don't change state if button is disabled
+        if self.NButton["state"] == DISABLED:
+            return
         self.transformSize1Entry["state"] = DISABLED
         self.transformSize2Entry["state"] = DISABLED
         self.transformSizeStatus.set("N_FT-1=N/2")
@@ -1541,24 +1567,25 @@ class SpectralGUI:
                     self.prop3V.set(self.prop3Value[k])
                     self.windowSelect.set(str(self.prop4Value[k]))
                     # Possibly adjust setting for model state
-                    if self.hzEnabled[k]:
-                        self.modelHzButton["state"] = NORMAL
-                    else:
-                        self.modelHzButton["state"] = DISABLED
-                        if self.modelState == "H(z)":
-                            if self.hsEnabled[k]:
-                                self.handle_modelHs()
-                            else:
-                                self.handle_modelDis()
-                    if self.hsEnabled[k]:
-                        self.modelHsButton["state"] = NORMAL
-                    else:
-                        self.modelHsButton["state"] = DISABLED
-                        if self.modelState == "H(s)":
-                            if self.hzEnabled[k]:
-                                self.handle_modelHz()
-                            else:
-                                self.handle_modelDis()
+                    if not self.spectral:
+                        if self.hzEnabled[k]:
+                            self.modelHzButton["state"] = NORMAL
+                        else:
+                            self.modelHzButton["state"] = DISABLED
+                            if self.modelState == "H(z)":
+                                if self.hsEnabled[k]:
+                                    self.handle_modelHs()
+                                else:
+                                    self.handle_modelDis()
+                        if self.hsEnabled[k]:
+                            self.modelHsButton["state"] = NORMAL
+                        else:
+                            self.modelHsButton["state"] = DISABLED
+                            if self.modelState == "H(s)":
+                                if self.hzEnabled[k]:
+                                    self.handle_modelHz()
+                                else:
+                                    self.handle_modelDis()
             self.port.writeL("set filter " + newFilter)
             self.resetYSpectra()
             # Clear the buffer
@@ -1701,6 +1728,8 @@ class SpectralGUI:
         if self.prop3Type[self.filterIndex] == "Integer":
             try:
                 newProp = int(self.prop3V.get())
+                # Special case for this property: The filter order must be a multitude of 2
+                newProp = 2*int(newProp/2)
             except ValueError:
                 pass
         elif self.prop3Type[self.filterIndex] == "Float":
@@ -1830,16 +1859,25 @@ class SpectralGUI:
     
     # Callback function for changing the model to "Disabled"
     def handle_modelDis(self, event=None):
+        # Don't change state if button is disabled
+        if self.modelDisButton["state"] == DISABLED:
+            return
         self.modelState = "Disabled"
         self.updateModelState()
     
     # Callback function for changing the model to "H(z)"
     def handle_modelHz(self, event=None):
+        # Don't change state if button is disabled
+        if self.modelHzButton["state"] == DISABLED:
+            return
         self.modelState = "H(z)"
         self.updateModelState()
     
     # Callback function for changing the model to "H(s)"
     def handle_modelHs(self, event=None):
+        # Don't change state if button is disabled
+        if self.modelHsButton["state"] == DISABLED:
+            return
         self.modelState = "H(s)"
         self.updateModelState()
     
