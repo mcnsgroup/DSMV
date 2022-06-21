@@ -185,7 +185,7 @@ float proc_fir(float xn, int32_t xnRaw, float props[]) {
                               // Computation using double buffer
                               filteredInt += dataBufferInt[fir_bufPos + i] * filtercoeffInt[i];
                             }
-                            T4toggle(LED_3);
+                            //T4toggle(LED_3);
                             // Shift by factor of the coefficient array
                             filtered = filteredInt >> 7;
                             // Convert into a voltage
