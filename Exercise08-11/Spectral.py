@@ -5,9 +5,15 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 20.06.2022, ver1.20
+# 21.06.2022, ver1.21
 # 
 # Changelog
+#   - 21.06.2022: Added arithmetic options for different handlings of modulo,
+#                 changed data tips for spectra to entire axis data tip,
+#                 fixed a bug that caused the model state buttons to still trigger if disabled,
+#                 fixed a bug that caused the model state buttons to not be disabled and enabled when appropriate,
+#                 fixed a bug that caused the second spectrum to be displayed when not in spectal mode,
+#                 fixed a bug that caused the filter order to accept odd numbers
 #   - 20.06.2022: Fixed a bug that caused the arithmetic to not update,
 #                 changed the arithmetic to combobox selector
 #   - 17.06.2022: Added functionality to switch between H(z) and H(s) model for non-FIR filters,
