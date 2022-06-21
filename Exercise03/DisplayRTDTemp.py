@@ -5,9 +5,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 10.05.2022, ver1.7
+# 21.06.2022, ver1.8
 # 
 # Changelog
+#   - 21.06.2022: Update to maintain compatibility with newer version of DSMVLib module
 #   - 10.05.2022: Added functionality to display the values of a point clicked on the plots
 #   - 03.05.2022: Moved entry box processing to DSMVLib module,
 #                 greatly improved performance of histograms
