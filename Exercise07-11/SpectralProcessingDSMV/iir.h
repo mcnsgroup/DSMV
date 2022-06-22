@@ -3,6 +3,7 @@ float ynhist[Niirmax];
 float xnhist[Niirmax];
 
 #include "fdacoefs20.h"
+
 #ifndef real32_T
 /****** low pass filter
 float alpha = 25000/(2*PI*2000);
@@ -22,10 +23,10 @@ float bn[] = {-1.5189, 0.96, -0.2120};
 float bn[] = {0.0061888, 0.018566, 0.018566, 0.006188};
 // factors a_n (for y_n). always use an[0]=1 
 float an[] = {1, -2.342136, 2.0015668, -0.6099202};
-*/
 
 int Na = sizeof(an)/sizeof(an[0]);
 int Nb = sizeof(bn)/sizeof(bn[0]);
+*/
 #endif
 
 /** @brief Applies an IIR filter to a signal
