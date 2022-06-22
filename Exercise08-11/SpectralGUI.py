@@ -17,9 +17,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 21.06.2022, ver1.21
+# 22.06.2022, ver1.21.1
 # 
 # Changelog
+#   - 22.06.2022: Changed visual appearance to use tabs for all controls
 #   - 21.06.2022: Added arithmetic options for different handlings of modulo,
 #                 changed data tips for spectra to entire axis data tip,
 #                 fixed a bug that caused the model state buttons to still trigger if disabled,
@@ -179,7 +180,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.21")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.21.1")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -286,9 +287,9 @@ class SpectralGUI:
         self.procEntry.bind("<Return>", self.handle_updateProc)
         self.procEntry.bind("<KP_Enter>", self.handle_updateProc)
         self.procEntry.bind("<FocusOut>", self.handle_updateProc)
-        # Minimum data size
+        # Minimum processing frequency
         self.procMin = 1
-        # Maximum data size
+        # Maximum processing frequency
         self.procMax = 80000
         self.tabsystem = ttk.Notebook(self.controlFrame)
         self.uiElements.append(self.tabsystem)
@@ -822,10 +823,6 @@ class SpectralGUI:
         self.uiGridParams.append([2, 0, 1, 2, "NESW"])
         # Create data tip for spectra
         self.dataTipSpectra = L.dataTip(canvas2, self.ax2, 0.01)
-        # Create data tip for spectrum 1
-        #self.dataTipSpectrum1 = L.dataTip(canvas2, self.ax2, self.spectrum1, 0.01, "b")
-        # Create data tip for spectrum 2
-        #self.dataTipSpectrum2 = L.dataTip(canvas2, self.ax2, self.spectrum2, 0.01, "r")
         # Create frame for saving the plot
         self.saveFrame2 = Frame()
         self.uiElements.append(self.saveFrame2)
@@ -1340,7 +1337,7 @@ class SpectralGUI:
             self.winFunc1 = "Window" + self.window1.get() + "." + "Window" + self.window1.get()
             self.resetYSpectra()
     
-    # Event handler for window selector 1
+    # Event handler for window selector 2
     def handle_updateWindow2(self, event=None):
         if self.window2.get() == "Disabled":
             self.spectrum2.set_visible(False)
