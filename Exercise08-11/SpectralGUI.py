@@ -17,10 +17,11 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 22.06.2022, ver1.21.1
+# 22.06.2022, ver1.22
 # 
 # Changelog
-#   - 22.06.2022: Changed visual appearance to use tabs for all controls
+#   - 22.06.2022: Changed visual appearance to use tabs for all controls,
+#                 added functionality to respect filter window in model for FIR filters
 #   - 21.06.2022: Added arithmetic options for different handlings of modulo,
 #                 changed data tips for spectra to entire axis data tip,
 #                 fixed a bug that caused the model state buttons to still trigger if disabled,
@@ -180,7 +181,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.21.1")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.22")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -1893,6 +1894,8 @@ class SpectralGUI:
             self.phaseModel.set_visible(False)
             return
         curFilter = self.filters[self.filterIndex]
+        import WindowHamming
+        import WindowRectangle
         if curFilter == "Scaling":
             self.transferModel.set_ydata([1] * (self.freqs1 - 1))
             phases = np.linspace(0, -2*np.pi, self.freqs1)
@@ -1945,9 +1948,11 @@ class SpectralGUI:
             if self.modelState == "H(z)":
                 hres = np.divide((np.sin(np.multiply(phi2, k)) - np.sin(np.multiply(phi1, k))), np.multiply(np.pi, k))
                 hres[int((len(hres)-1) / 2)] = (phi2-phi1) / np.pi
-            elif self.modelState == "H(s)":
-                hres = np.divide((np.sin(np.multiply(phi2, k)) - np.sin(np.multiply(phi1, k))), np.multiply(np.pi, k))
-                hres[int((len(hres)-1) / 2)] = (phi2-phi1) / np.pi
+                win, dummyVal = eval("Window" + self.prop4Value[self.filterIndex] + ".Window" + self.prop4Value[self.filterIndex] + "(" + str(nFilter+1) + ")")
+                hres = np.multiply(hres, np.pad(win, (len(hres)-len(win)), constant_values=(1, 1)))
+            #elif self.modelState == "H(s)":
+            #    hres = np.divide((np.sin(np.multiply(phi2, k)) - np.sin(np.multiply(phi1, k))), np.multiply(np.pi, k))
+            #    hres[int((len(hres)-1) / 2)] = (phi2-phi1) / np.pi
             self.prop1Value[self.filterIndex]
             self.normIndex[self.filterIndex] = int((self.prop1Value[self.filterIndex] + self.prop2Value[self.filterIndex]) * 
                                                     len(self.transferModel.get_xdata()) / self.proc)
@@ -1964,9 +1969,11 @@ class SpectralGUI:
             if self.modelState == "H(z)":
                 hres = -np.divide((np.sin(np.multiply(phi2, k)) - np.sin(np.multiply(phi1, k))), np.multiply(np.pi, k))
                 hres[int((len(hres)-1) / 2)] = 1 - (phi2-phi1) / np.pi
-            elif self.modelState == "H(s)":
-                hres = -np.divide((np.sin(np.multiply(phi2, k)) - np.sin(np.multiply(phi1, k))), np.multiply(np.pi, k))
-                hres[int((len(hres)-1) / 2)] = 1 - (phi2-phi1) / np.pi
+                win, dummyVal = eval("Window" + self.prop4Value[self.filterIndex] + ".Window" + self.prop4Value[self.filterIndex] + "(" + str(nFilter+1) + ")")
+                hres = np.multiply(hres, np.pad(win, (len(hres)-len(win)), constant_values=(1, 1)))
+            #elif self.modelState == "H(s)":
+            #    hres = -np.divide((np.sin(np.multiply(phi2, k)) - np.sin(np.multiply(phi1, k))), np.multiply(np.pi, k))
+            #    hres[int((len(hres)-1) / 2)] = 1 - (phi2-phi1) / np.pi
             Hzf = np.fft.fft(hres, n=2*len(self.transferModel.get_xdata()))
             Hzf = Hzf[1:int(len(Hzf)/2)+1]
             self.transferModel.set_ydata(np.divide(abs(Hzf), abs(Hzf)[self.normIndex[self.filterIndex]]))
@@ -1979,9 +1986,11 @@ class SpectralGUI:
             if self.modelState == "H(z)":
                 hres = np.divide(np.sin(np.multiply(phic, k)), np.multiply(np.pi, k))
                 hres[int((len(hres)-1) / 2)] = phic / np.pi
-            elif self.modelState == "H(s)":
-                hres = np.divide(np.sin(np.multiply(phic, k)), np.multiply(np.pi, k))
-                hres[int((len(hres)-1) / 2)] = phic / np.pi
+                win, dummyVal = eval("Window" + self.prop4Value[self.filterIndex] + ".Window" + self.prop4Value[self.filterIndex] + "(" + str(nFilter+1) + ")")
+                hres = np.multiply(hres, np.pad(win, (len(hres)-len(win)), constant_values=(1, 1)))
+            #elif self.modelState == "H(s)":
+            #    hres = np.divide(np.sin(np.multiply(phic, k)), np.multiply(np.pi, k))
+            #    hres[int((len(hres)-1) / 2)] = phic / np.pi
             Hzf = np.fft.fft(hres, n=2*len(self.transferModel.get_xdata()))
             Hzf = Hzf[1:int(len(Hzf)/2)+1]
             self.transferModel.set_ydata(np.divide(abs(Hzf), abs(Hzf)[self.normIndex[self.filterIndex]]))
@@ -1994,9 +2003,11 @@ class SpectralGUI:
             if self.modelState == "H(z)":
                 hres = np.subtract(np.divide(np.sin(np.multiply(np.pi, k)), np.multiply(np.pi, k)), np.divide(np.sin(np.multiply(phic, k)), np.multiply(np.pi, k)))
                 hres[int((len(hres)-1) / 2)] = 1 - phic / np.pi
-            elif self.modelState == "H(s)":
-                hres = np.subtract(np.divide(np.sin(np.multiply(np.pi, k)), np.multiply(np.pi, k)), np.divide(np.sin(np.multiply(phic, k)), np.multiply(np.pi, k)))
-                hres[int((len(hres)-1) / 2)] = 1 - phic / np.pi
+                win, dummyVal = eval("Window" + self.prop4Value[self.filterIndex] + ".Window" + self.prop4Value[self.filterIndex] + "(" + str(nFilter+1) + ")")
+                hres = np.multiply(hres, np.pad(win, (len(hres)-len(win)), constant_values=(1, 1)))
+            #elif self.modelState == "H(s)":
+            #    hres = np.subtract(np.divide(np.sin(np.multiply(np.pi, k)), np.multiply(np.pi, k)), np.divide(np.sin(np.multiply(phic, k)), np.multiply(np.pi, k)))
+            #    hres[int((len(hres)-1) / 2)] = 1 - phic / np.pi
             Hzf = np.fft.fft(hres, n=2*len(self.transferModel.get_xdata()))
             Hzf = Hzf[1:int(len(Hzf)/2)+1]
             self.transferModel.set_ydata(np.divide(abs(Hzf), abs(Hzf)[self.normIndex[self.filterIndex]]))
