@@ -1,5 +1,6 @@
-# 21.06.2022, Version 0.2.20
+# 22.06.2022, version 0.2.21
 # Changelog
+#	- 22.06.2022: Fixed a bug that caused the axis rescaling to not work properly for singular value plots
 #	- 21.06.2022: Added functionality to save the data of a figure as a .csv file,
 #				  added functionality to get all visible plots (lines) from an axis,
 #				  added functionality to create a data tip for all plots of an axis,
@@ -382,12 +383,12 @@ def rescaleAx(ax, rescaleX=True, rescaleY=True):
 		return
 	if rescaleX:
 		xData = lines[0].get_xdata()
-		minX = min(xData)
-		maxX = max(xData)
+		minX = np.min(xData)
+		maxX = np.max(xData)
 		for line in lines:
 			xData = line.get_xdata()
-			curMin = min(xData)
-			curMax = max(xData)
+			curMin = np.min(xData)
+			curMax = np.max(xData)
 			if curMin < minX:
 				minX = curMin
 			if curMax > maxX:
@@ -405,12 +406,12 @@ def rescaleAx(ax, rescaleX=True, rescaleY=True):
 			ax.set_xlim(minX / np.exp(spaceX), maxX * np.exp(spaceX))
 	if rescaleY:
 		yData = lines[0].get_ydata()
-		minY = min(yData)
-		maxY = max(yData)
+		minY = np.min(yData)
+		maxY = np.max(yData)
 		for line in lines:
 			yData = line.get_ydata()
-			curMin = min(yData)
-			curMax = max(yData)
+			curMin = np.min(yData)
+			curMax = np.max(yData)
 			if curMin < minY:
 				minY = curMin
 			if curMax > maxY:
