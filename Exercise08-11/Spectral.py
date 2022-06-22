@@ -5,9 +5,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 21.06.2022, ver1.21
+# 22.06.2022, ver1.21.1
 # 
 # Changelog
+#   - 22.06.2022: Changed visual appearance to use tabs for all controls
 #   - 21.06.2022: Added arithmetic options for different handlings of modulo,
 #                 changed data tips for spectra to entire axis data tip,
 #                 fixed a bug that caused the model state buttons to still trigger if disabled,
