@@ -7,10 +7,14 @@
  *  
  *  @author Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
  *  @author Philipp Rahe (prahe@uos.de)
- *  @date 17.06.2022
- *  @version 1.6
+ *  @date 27.06.2022
+ *  @version 1.8
  *  
  *  @par Changelog
+ *  - 27.06.2022: Fixed a bug that caused the IIR-Filter to not use the most recent values correctly,
+ *                changed arithmetic to the format of a filter property
+ *  - 21.06.2022: Fixed a bug that caused the updated arithmetic to only be applied to the current filter,
+ *                added functionality to configure all different arithmetics via USB command
  *  - 17.06.2022: Added functionality to configure FIR filter arithmetic via USB command,
  *                significantly improved the performance of FIR filters,
  *                moved all filters to external files
@@ -66,16 +70,17 @@
 #include <AD5791.h>
 #include <DSMV_Board.h>
 
-float offsetAD4020 = 0;         /**< Offset voltage for the AD4020. */
-float gainAD4020 = 1.0;         /**< Gain factor for the AD4020. */
-float offsetLTC2500 = 0;        /**< Offset voltage for the LTC2500. */
-float gainLTC2500 = 1.0;        /**< Gain factor for the LTC2500. */
+float offsetAD4020 = 0;   /**< Offset voltage for the AD4020. */
+float gainAD4020 = 1.0;   /**< Gain factor for the AD4020. */
+float offsetLTC2500 = 0;  /**< Offset voltage for the LTC2500. */
+float gainLTC2500 = 1.0;  /**< Gain factor for the LTC2500. */
 
 bool blinker = false; /**< Specifies usage of LED_1. true: 1s interval (Note: This deactivates the analog output!). false: loop duration. */
 
 #define RES_AD4020  0.0000190734863 /**< Resolution of the AD4020. */
 #define RES_LTC2500 0.0000011920929 /**< Resolution of the LTC2500. */
 #define LTC2500mode noLatencyOutput /**< Specifies the output mode of the LTC2500. */
+#define INVALID -1                  /**< Invalid command. */
 #define settingMode 0               /**< Setting for the mode of operation. */
 #define settingOversamples 1        /**< Setting for the number of oversamples: */
 #define settingSize 2               /**< Setting for the data size. */
@@ -87,11 +92,10 @@ bool blinker = false; /**< Specifies usage of LED_1. true: 1s interval (Note: Th
 #define settingFilterProperty2 8    /**< Setting for the 2nd filter porperty. */
 #define settingFilterProperty3 9    /**< Setting for the 3rd filter porperty. */
 #define settingFilterProperty4 10   /**< Setting for the 4rd filter porperty. */
-#define settingArithmetic 11        /**< Setting for the arithmetic used by the filters. */
+#define settingFilterProperty5 11        /**< Setting for the arithmetic used by the filters. */
 #define commandRequest 12           /**< Command for requesting data to be sent to the PC. */
 #define signalVoltage 0             /**< Voltage read from ADCs. */
 #define signalRaw 1                 /**< Raw value read from ADCs. */
-#define INVALID -1                  /**< Invalid command. */
 
 #define spectral 0    /**< Spectral analysis of AD4020 and signal processing (base functionality). */
 #define shortPulse 1  /**< Short on-off pulse and base functionality. */
@@ -115,13 +119,13 @@ const int numProps = 6;     /**< Number of properties per filter. */
 #define hpf1 3
 #define defaultHpf1 {0, NULL, NULL, NULL, NULL, defaultProcessingRate}
 #define bandpass 4
-#define defaultBandpass {0, 0, 1, rectWin, integerArithmetic, defaultProcessingRate}
+#define defaultBandpass {0, 0, 1, rectWin, integerDoubleBuffer, defaultProcessingRate}
 #define bandstop 5
-#define defaultBandstop {0, 0, 1, rectWin, integerArithmetic, defaultProcessingRate}
+#define defaultBandstop {0, 0, 1, rectWin, integerDoubleBuffer, defaultProcessingRate}
 #define FIRlow 6
-#define defaultFIRlow {0, NULL, 1, rectWin, integerArithmetic, defaultProcessingRate}
+#define defaultFIRlow {0, NULL, 1, rectWin, integerDoubleBuffer, defaultProcessingRate}
 #define FIRhigh 7
-#define defaultFIRhigh {0, NULL, 1, rectWin, integerArithmetic, defaultProcessingRate}
+#define defaultFIRhigh {0, NULL, 1, rectWin, integerDoubleBuffer, defaultProcessingRate}
 #define lpf2 8
 #define defaultLpf2 {0, NULL, NULL, NULL, NULL, defaultProcessingRate}
 #define lpf3 9
@@ -200,7 +204,7 @@ void setup() {
 
   /******************************
    * Finalise setup */
-  T4addSerialFunc(checkUpdateUSB);   // Set the function to check the serial port for commands
+  T4addSerialFunc(checkUpdateUSB);        // Set the function to check the serial port for commands
   interrupts();                           // Setup complete, activate interrupts
 }
 
@@ -287,7 +291,7 @@ void spectralRead() {
 }
 
 
-/** @brief Toggling the LED output state to indicate that the program is still running correctly
+/** @brief Toggling the LED_1 to indicate that the program is still running correctly
  */
 void blinking() {
   T4toggle(LED_1);
@@ -318,7 +322,7 @@ void readProcessOutput() {
   float outputValue = voltageLTC2500;
   
   // Trigger timing LED to measure filter performance
-  T4toggle(LED_3);
+  //T4toggle(LED_3);
   /***** Processing of input data */
   switch(filter) {
     case scaling:   outputValue = proc_scale(outputValue, filterProperties[filter]);
@@ -344,7 +348,7 @@ void readProcessOutput() {
     case progIIR:   outputValue = proc_iir(outputValue, filterProperties[filter]);
                     break;
   }
-  T4toggle(LED_3);
+  //T4toggle(LED_3);
 
   // Apply scaling gain if not done already
   if(filter != scaling) {outputValue *= scalingGain;}
@@ -608,16 +612,28 @@ bool checkUpdateUSB(String command) {
                                 }
                                 return true;
                                 break;
-    case settingArithmetic:     command.remove(0, 15);
+    case settingFilterProperty5:command.remove(0, 20);
                                 switch(checkArithmetic(command)) {
-                                  case integerArithmetic: filterProperties[filter][4] = integerArithmetic;
-                                                          return true;
-                                                          break;
-                                  case floatArithmetic:   filterProperties[filter][4] = floatArithmetic;
-                                                          return true;
-                                                          break;
-                                  case INVALID:           return false;
-                                                          break;
+                                  case integerDoubleBuffer: filterProperties[filter][4] = integerDoubleBuffer;
+                                                            return true;
+                                                            break;
+                                  case integerIfModulo:     filterProperties[filter][4] = integerIfModulo;
+                                                            return true;
+                                                            break;
+                                  case integerModulo:       filterProperties[filter][4] = integerModulo;
+                                                            return true;
+                                                            break;
+                                  case floatDoubleBuffer:   filterProperties[filter][4] = floatDoubleBuffer;
+                                                            return true;
+                                                            break;
+                                  case floatIfModulo:       filterProperties[filter][4] = floatIfModulo;
+                                                            return true;
+                                                            break;
+                                  case floatModulo:         filterProperties[filter][4] = floatModulo;
+                                                            return true;
+                                                            break;
+                                  case INVALID:             return false;
+                                                            break;
                                 }
                                 break;
     case commandRequest:        request = true;
@@ -644,6 +660,7 @@ bool checkUpdateUSB(String command) {
  *  set filterProperty2   ->  settingFilterProperty2
  *  set filterProperty3   ->  settingFilterProperty3
  *  set filterProperty4   ->  settingFilterProperty4
+ *  set filterProperty5   ->  settingFilterProperty5
  *  send data             ->  commandRequest
  *
  *  @param command Command (in ASCII format) as received from PC
@@ -661,7 +678,7 @@ int checkCommand(String command) {
   if(command.startsWith("set filterProperty2 "))  {return settingFilterProperty2;}
   if(command.startsWith("set filterProperty3 "))  {return settingFilterProperty3;}
   if(command.startsWith("set filterProperty4 "))  {return settingFilterProperty4;}
-  if(command.startsWith("set arithmetic "))       {return settingArithmetic;}
+  if(command.startsWith("set filterProperty5 "))  {return settingFilterProperty5;}
   if(command.startsWith("send data"))             {return commandRequest;}
   return INVALID;
 }
@@ -757,14 +774,22 @@ int checkWindow(String command) {
  *
  *  Currently implemented are the maps:
  *
- *  Integer ->  integerArithmetic
- *  Float   ->  floatArithmetic
+ *  Integer double buffer ->  integerDoubleBuffer
+ *  Integer if modulo     ->  integerIfModulo
+ *  Integer modulo        ->  integerModulo
+ *  Float double buffer   ->  floatArithmetic
+ *  Float if modulo       ->  floatIfModulo
+ *  Float modulo          ->  floatModulo
  *
  *  @param command Window names (in ASCII format) as received from PC
  *  @return numerical identifier for the respective window.
  */
 int checkArithmetic(String command) {
-  if(command.startsWith("Integer")) {return integerArithmetic;}
-  if(command.startsWith("Float"))   {return floatArithmetic;}
+  if(command.startsWith("Integer double buffer")) {return integerDoubleBuffer;}
+  if(command.startsWith("Integer if modulo"))     {return integerIfModulo;}
+  if(command.startsWith("Integer modulo"))        {return integerModulo;}
+  if(command.startsWith("Float double buffer"))   {return floatDoubleBuffer;}
+  if(command.startsWith("Float if modulo"))       {return floatIfModulo;}
+  if(command.startsWith("Float modulo"))          {return floatModulo;}
   return INVALID;
 }
