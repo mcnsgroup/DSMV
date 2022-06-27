@@ -1,27 +1,40 @@
 # PyFDAConvertCPP converts a .csv file defining an IIR filter from the pyFDA to a .h file for c++ programming.
 # 
-# The .csv file used will be the first one in the directory of this programm in alphabetical order.
+# The .csv file used is specified with the first input argument when running the script.
+# The .h output file can be named with the second input argument when running the script.
+# If no name is given, its name will be fdacoeffs.h.
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 21.06.2022, version 0.2
+# 27.06.2022, version 0.3
 # 
 # Changelog
+#   - 27.06.2022: Added functionality to specify source and destination,
+#                 changed data format from double to float
 #   - 21.06.2022: Fixed a bug that caused the .h file to miss semicolons after array definitions
 #   - 07.03.2022: Initial version
 
 # import modules
 import csv
-import glob
-import os
+import sys
+
+args = sys.argv
+
+# Check if input arguments are present
+if len(args) == 1:
+    print("You have to specify a .csv file to convert.")
+    quit()
 
 # Get file path
-dir = os.path.relpath(__file__)
-dir = dir[0:len(dir)-18]
-pathFiles=glob.glob(dir + "*.csv")
-
+pathInput = args[1]
 # open the raw file
-rawFile = open(pathFiles[0], 'r')
+rawFile = None
+try:
+    rawFile = open(pathInput, 'r')
+except FileNotFoundError:
+    print("Could not find source file: " + str(pathInput))
+    quit()
+
 reader = csv.reader(rawFile)
 
 # get the number of coefficients
@@ -34,8 +47,9 @@ for row in reader:
 rawFile.seek(0)
 
 # create .h file
-# new file name
-newName = pathFiles[0][0:len(pathFiles[0])-4] + ".h"
+newName = "fdacoeffs.h"
+if len(args) == 3:
+    newName = args[2]
 hFile = open(newName, "w")
 
 # write contents to .h file
@@ -43,7 +57,7 @@ hFile.write("const int Nb = ")
 hFile.write(str(rowLen))
 hFile.write(";\nconst int Na = ")
 hFile.write(str(rowLen))
-hFile.write(";\n\nconst double bn[Nb] = {\n")
+hFile.write(";\n\nconst float bn[Nb] = {\n")
 for row in reader:
     for item in row:
         hFile.write(str(item))
@@ -55,7 +69,7 @@ data = hFile.read()
 hFile.close()
 hFile = open(newName, "w")
 hFile.write(data[:-2])
-hFile.write("\n};\n\nconst double an[Na] = {\n")
+hFile.write("\n};\n\nconst float an[Na] = {\n")
 for row in reader:
     for item in row:
         hFile.write(str(item))
