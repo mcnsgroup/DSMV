@@ -17,9 +17,14 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 22.06.2022, ver1.22
+# 27.06.2022, ver1.23
 # 
 # Changelog
+#   - 27.06.2022: Fixed a bug that caused the impulse response averaging to not reset,
+#                 changed arithmetic to format of a filter property,
+#                 added automatic normalization index to bandpass filter,
+#                 removed normalized spectrum option for IIR filter,
+#                 fixed a bug that caused the reading to not resume after a reconnect when not in spectral mode
 #   - 22.06.2022: Changed visual appearance to use tabs for all controls,
 #                 added functionality to respect filter window in model for FIR filters
 #   - 21.06.2022: Added arithmetic options for different handlings of modulo,
@@ -129,7 +134,6 @@ import numpy as np
 from matplotlib.pyplot import *
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import matplotlib.animation as animation
 from tkinter import *
 from tkinter import ttk
 import struct
@@ -181,7 +185,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.22")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.23")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -330,8 +334,9 @@ class SpectralGUI:
         self.unitLabels = [self.psdLabel, self.psLabel, self.asdLabel, self.asLabel, self.normLabel]
         # List of different spectrum units
         self.unitList = ["Power Spectral Density", "Power Spectrum", "Amplitude Spectral Density", "Amplitude Spectrum", "Normalized Spectrum"]
+        self.unitListReduced = ["Power Spectral Density", "Power Spectrum", "Amplitude Spectral Density", "Amplitude Spectrum"]
         # Create combo box for spectrum unit selector
-        self.unitSelect = ttk.Combobox(master=self.avgUnitFrame, values = self.unitList, state="readonly")
+        self.unitSelect = ttk.Combobox(master=self.avgUnitFrame, values=self.unitList, state="readonly")
         self.uiElements.append(self.unitSelect)
         self.uiGridParams.append([0, 3, 1, 1, "WE"])
         self.unitSelect.bind('<<ComboboxSelected>>', self.handle_updateUnit)
@@ -513,7 +518,7 @@ class SpectralGUI:
         # Create filter property 1 entry box
         self.prop1Entry = Entry(master=self.filterFrame, textvariable=self.prop1V, justify=RIGHT)
         self.uiElements.append(self.prop1Entry)
-        self.uiGridParams.append([1, 1, 1, 3, "WE"])
+        self.uiGridParams.append([1, 1, 1, 1, "WE"])
         self.prop1Entry.bind("<Return>", self.handle_updateProp1)
         self.prop1Entry.bind("<KP_Enter>", self.handle_updateProp1)
         self.prop1Entry.bind("<FocusOut>", self.handle_updateProp1)
@@ -539,7 +544,7 @@ class SpectralGUI:
         # Create filter property 2 entry box
         self.prop2Entry = Entry(master=self.filterFrame, textvariable=self.prop2V, justify=RIGHT)
         self.uiElements.append(self.prop2Entry)
-        self.uiGridParams.append([2, 1, 1, 3, "WE"])
+        self.uiGridParams.append([2, 1, 1, 1, "WE"])
         self.prop2Entry.bind("<Return>", self.handle_updateProp2)
         self.prop2Entry.bind("<KP_Enter>", self.handle_updateProp2)
         self.prop2Entry.bind("<FocusOut>", self.handle_updateProp2)
@@ -565,7 +570,7 @@ class SpectralGUI:
         # Create filter property 3 entry box
         self.prop3Entry = Entry(master=self.filterFrame, textvariable=self.prop3V, justify=RIGHT)
         self.uiElements.append(self.prop3Entry)
-        self.uiGridParams.append([3, 1, 1, 3, "WE"])
+        self.uiGridParams.append([3, 1, 1, 1, "WE"])
         self.prop3Entry.bind("<Return>", self.handle_updateProp3)
         self.prop3Entry.bind("<KP_Enter>", self.handle_updateProp3)
         self.prop3Entry.bind("<FocusOut>", self.handle_updateProp3)
@@ -593,9 +598,38 @@ class SpectralGUI:
         # Create combo box for window selector
         self.windowSelect = ttk.Combobox(master=self.filterFrame, values = self.windows, state="readonly")
         self.uiElements.append(self.windowSelect)
-        self.uiGridParams.append([4, 1, 1, 3, "WE"])
+        self.uiGridParams.append([4, 1, 1, 1, "WE"])
         self.windowSelect.bind("<<ComboboxSelected>>", self.handle_updateWindow)
         self.windowSelect.set(str(self.prop4Value[self.filterIndex]))
+        
+        
+        # Names for the filter property 5
+        self.prop5Names = ["", "", "", "", "Arithmetic", "Arithmetic", "Arithmetic", "Arithmetic", "", "", ""]
+        # Visibility of filter property 5
+        self.prop5Visible = [False, False, False, False, True, True, True, True, False, False, False]
+        # Create label for the filter property 5 combo box
+        self.prop5Label = Label(master=self.filterFrame, text=self.prop5Names[filterDefIndex])
+        self.uiElements.append(self.prop5Label)
+        self.uiGridParams.append([5, 0, 1, 1, "E"])
+        # Value type for the filter property 5
+        self.prop5Type = ["", "", "", "", "String", "String", "String", "String", "", "", ""]
+        # Default values for the filter property 5 (later current values)
+        self.prop5Value = [None, None, None, None, "Integer double buffer", "Integer double buffer", "Integer double buffer", "Integer double buffer", None, None, None]
+        # Minimum values for the filter property 5
+        self.prop5Min = [None, None, None, None, None, None, None, None, None, None, None]
+        # Maximum values for the filter property 5
+        self.prop5Max = [None, None, None, None, None, None, None, None, None, None, None]
+        # Variable to control content of the filter property 5 entry box
+        self.prop5V = StringVar()
+        self.prop5V.set(str(self.prop5Value[filterDefIndex]))
+        # Values for arithmetic
+        self.arithmetics = ["Integer double buffer", "Integer if modulo", "Integer modulo", "Float double buffer", "Float if modulo", "Float modulo"]
+        # Create combo box for arithmetic selector
+        self.arithmeticSelect = ttk.Combobox(master=self.filterFrame, values = self.arithmetics, state="readonly")
+        self.uiElements.append(self.arithmeticSelect)
+        self.uiGridParams.append([5, 1, 1, 1, "WE"])
+        self.arithmeticSelect.bind("<<ComboboxSelected>>", self.handle_updateArithmetic)
+        self.arithmeticSelect.set(str(self.prop5Value[self.filterIndex]))
         # Value for model state
         self.modelState = "Disabled"
         # String variable for model state
@@ -604,11 +638,11 @@ class SpectralGUI:
         # Create label for the model selector
         self.modelLabel = Label(master=self.filterFrame, text="Model")
         self.uiElements.append(self.modelLabel)
-        self.uiGridParams.append([5, 0, 1, 1, "E"])
+        self.uiGridParams.append([1, 2, 1, 1, "E"])
         # Create frame for the model selector
         self.modelFrame = Frame(master=self.filterFrame)
         self.uiElements.append(self.modelFrame)
-        self.uiGridParams.append([5, 1, 1, 1, "NESW"])
+        self.uiGridParams.append([1, 2, 1, 1, "NESW"])
         # Create model selector buttons
         self.modelDisButton = Radiobutton(self.modelFrame, text="Disabled", variable = self.modelStateV, value="Disabled")
         self.uiElements.append(self.modelDisButton)
@@ -626,23 +660,6 @@ class SpectralGUI:
         self.hzEnabled = [True, True, True, True, True, True, True, True, True, True, False]
         # Array to store wether there is a H(s) to display for the respective filter
         self.hsEnabled = [True, True, True, True, False, False, False, False, True, True, False]
-        # Values for arithmetic
-        self.arithmetics = ["Integer double buffer", "Integer if modulo", "Integer modulo", "Float double buffer", "Float if modulo", "Float modulo"]
-        # Value for arithmetic
-        self.arithmetic = self.arithmetics[0]
-        # String variable for arithmetic
-        self.arithmeticV = StringVar()
-        self.arithmeticV.set(self.arithmetic)
-        # Create label for the arithmetic selector
-        self.arithmeticLabel = Label(master=self.filterFrame, text="Arithmetic")
-        self.uiElements.append(self.arithmeticLabel)
-        self.uiGridParams.append([5, 2, 1, 1, "E"])
-        # Create combo box for arithmetic selector
-        self.arithmeticSelect = ttk.Combobox(master=self.filterFrame, values = self.arithmetics, state="readonly")
-        self.uiElements.append(self.arithmeticSelect)
-        self.uiGridParams.append([5, 3, 1, 1, "WE"])
-        self.arithmeticSelect.bind("<<ComboboxSelected>>", self.handle_updateArithmetic)
-        self.arithmeticSelect.set(self.arithmetic)
         # create frame for the run control
         self.runFrame = Frame(master=self.controlFrame, relief=RIDGE, borderwidth=2)
         self.uiElements.append(self.runFrame)
@@ -960,10 +977,6 @@ class SpectralGUI:
         self.window.update_idletasks()
         self.handle_updateFilter()
         time.sleep(0.005)
-        self.waitLabel.configure(text=pre + "/")
-        self.window.update_idletasks()
-        self.handle_updateArithmetic()
-        time.sleep(0.005)
         self.waitLabel.grid_forget()
     
     # Event handler for operation mode selector
@@ -1004,6 +1017,7 @@ class SpectralGUI:
                 self.ax1.set_ylabel("Voltage AD4020 (V)")
                 self.samplerateV.set(self.procV.get())
                 self.handle_updateFreq()
+                time.sleep(0.01)
                 self.freqEntry["state"] = DISABLED
                 self.windowSelect1.set("Rectangle")
                 self.windowSelect2.set("Disabled")
@@ -1013,7 +1027,7 @@ class SpectralGUI:
                 self.windowSelect2["state"] = DISABLED
                 self.spectral = False
                 # Enable model buttons as appropriate
-                self.handle_updateFilter()
+                self.updateModelFilter()
                 self.modelDisButton["state"] = NORMAL
                 self.unitSelect.set("Normalized Spectrum")
                 self.handle_updateUnit()
@@ -1238,10 +1252,11 @@ class SpectralGUI:
         self.averaged = 0
         rezero1 = [0] * self.freqs1
         rezero2 = [0] * self.freqs2
-        # Possibly omit zero frequency
+        # Possibly omit zero frequency and reset averaging of impulse response
         if not self.spectral:
             rezero1 = rezero1[1:len(rezero1)]
             rezero2 = rezero2[1:len(rezero2)]
+            self.voltagePre = [0] * self.dataSize
         self.S1Pre = rezero1
         self.S2Pre = rezero2
         self.spectrum1.set_ydata(self.S1Pre)
@@ -1277,7 +1292,8 @@ class SpectralGUI:
         self.spectrum2.set_xdata(self.f2)
         self.phase1.set_xdata(self.f1)
         self.phase2.set_xdata(self.f2)
-        self.normIndex = [0, 0, 0, self.freqs1-2, -1, 0, 0, self.freqs1-2, 0, 0, None]
+        middle = int(self.freqs1 * (self.prop1Value[4] + self.prop2Value[4]) / self.samplerate) - 1
+        self.normIndex = [0, 0, 0, self.freqs1-2, middle, 0, 0, self.freqs1-2, 0, 0, None]
         if self.spectral:
             self.transferModel.set_xdata(self.f1[1:len(self.f1)])
             self.phaseModel.set_xdata(self.f1[1:len(self.f1)])
@@ -1512,6 +1528,28 @@ class SpectralGUI:
         self.transformSizeStatus.set("N_FT-1=N/2")
         self.handle_updateSize(force=True)
     
+    # Updates the model state buttons according to the filter
+    def updateModelFilter(self):
+        if not self.spectral:
+            if self.hzEnabled[self.filterIndex]:
+                self.modelHzButton["state"] = NORMAL
+            else:
+                self.modelHzButton["state"] = DISABLED
+                if self.modelState == "H(z)":
+                    if self.hsEnabled[self.filterIndex]:
+                        self.handle_modelHs()
+                    else:
+                        self.handle_modelDis()
+            if self.hsEnabled[self.filterIndex]:
+                self.modelHsButton["state"] = NORMAL
+            else:
+                self.modelHsButton["state"] = DISABLED
+                if self.modelState == "H(s)":
+                    if self.hzEnabled[self.filterIndex]:
+                        self.handle_modelHz()
+                    else:
+                        self.handle_modelDis()
+    
     # Event handler for signal filter selector
     def handle_updateFilter(self, event=None, recursive=False, recReact=False, val=None):
         newFilter = self.filterSelect.get()
@@ -1535,6 +1573,8 @@ class SpectralGUI:
             self.prop3Entry.grid_forget()
             self.prop4Label.grid_forget()
             self.windowSelect.grid_forget()
+            self.prop5Label.grid_forget()
+            self.arithmeticSelect.grid_forget()
             for k in range(len(self.filters)):
                 if newFilter == self.filters[k]:
                     self.filterIndex = k
@@ -1542,48 +1582,34 @@ class SpectralGUI:
                     self.prop2Label.configure(text=self.prop2Names[k])
                     self.prop3Label.configure(text=self.prop3Names[k])
                     self.prop4Label.configure(text=self.prop4Names[k])
+                    self.prop5Label.configure(text=self.prop5Names[k])
                     if self.prop1Visible[k]:
                         self.prop1Label.grid(row=1, column=0, sticky="E")
-                        self.prop1Entry.grid(row=1, column=1, columnspan=3, sticky="WE")
+                        self.prop1Entry.grid(row=1, column=1, columnspan=1, sticky="WE")
                     else:
                         pass
                     if self.prop2Visible[k]:
                         self.prop2Label.grid(row=2, column=0, sticky="E")
-                        self.prop2Entry.grid(row=2, column=1, columnspan=3, sticky="WE")
+                        self.prop2Entry.grid(row=2, column=1, columnspan=1, sticky="WE")
                     else:
                         pass
                     if self.prop3Visible[k]:
                         self.prop3Label.grid(row=3, column=0, sticky="E")
-                        self.prop3Entry.grid(row=3, column=1, columnspan=3, sticky="WE")
+                        self.prop3Entry.grid(row=3, column=1, columnspan=1, sticky="WE")
                     else:
                         pass
                     if self.prop4Visible[k]:
                         self.prop4Label.grid(row=4, column=0, sticky="E")
-                        self.windowSelect.grid(row=4, column=1, columnspan=3, sticky="WE")
+                        self.windowSelect.grid(row=4, column=1, columnspan=1, sticky="WE")
+                    if self.prop5Visible[k]:
+                        self.prop5Label.grid(row=5, column=0, sticky="E")
+                        self.arithmeticSelect.grid(row=5, column=1, columnspan=1, sticky="WE")
                     self.prop1V.set(self.prop1Value[k])
                     self.prop2V.set(self.prop2Value[k])
                     self.prop3V.set(self.prop3Value[k])
                     self.windowSelect.set(str(self.prop4Value[k]))
-                    # Possibly adjust setting for model state
-                    if not self.spectral:
-                        if self.hzEnabled[k]:
-                            self.modelHzButton["state"] = NORMAL
-                        else:
-                            self.modelHzButton["state"] = DISABLED
-                            if self.modelState == "H(z)":
-                                if self.hsEnabled[k]:
-                                    self.handle_modelHs()
-                                else:
-                                    self.handle_modelDis()
-                        if self.hsEnabled[k]:
-                            self.modelHsButton["state"] = NORMAL
-                        else:
-                            self.modelHsButton["state"] = DISABLED
-                            if self.modelState == "H(s)":
-                                if self.hzEnabled[k]:
-                                    self.handle_modelHz()
-                                else:
-                                    self.handle_modelDis()
+                    self.arithmeticSelect.set(str(self.prop5Value[k]))
+                    self.updateModelFilter()
             self.port.writeL("set filter " + newFilter)
             self.resetYSpectra()
             # Clear the buffer
@@ -1595,6 +1621,14 @@ class SpectralGUI:
                 self.window.after(0, self.readDisp)
             # resign from power
             self.busy = False
+            # Possibly adjust spectral unit
+            if newFilter == "Programmable IIR filter":
+                self.unitSelect["values"] = self.unitListReduced
+                if self.unitSelect.get() == "Normalized Spectrum":
+                    self.unitSelect.set("Amplitude Spectrum")
+                    self.handle_updateUnit()
+            else:
+                self.unitSelect["values"] = self.unitList
             # Update all filter properties
             time.sleep(0.005)
             self.handle_updateProp1(force=True)
@@ -1604,6 +1638,8 @@ class SpectralGUI:
             self.handle_updateProp3(force=True)
             time.sleep(0.005)
             self.handle_updateWindow(force=True)
+            time.sleep(0.005)
+            self.handle_updateArithmetic(force=True)
     
     # Event handler for filter property 1 entry box
     def handle_updateProp1(self, event=None, force=False, recursive=False, recReact=False, val=None):
@@ -1840,6 +1876,68 @@ class SpectralGUI:
         self.prop4V.set(str(self.prop4Value[self.filterIndex]))
         self.window.update_idletasks()
     
+    # Event handler for arithmetic selector
+    def handle_updateArithmetic(self, event=None, force=False):
+        self.prop5V.set(self.arithmeticSelect.get())
+        self.handle_updateProp5(force)
+    
+    # Update function for filter property 5
+    def handle_updateProp5(self, force=False, recursive=False, recReact=False, val=None):
+        # Make sure the input has the correct type
+        newProp = self.prop5Value[self.filterIndex]
+        if self.prop5Type[self.filterIndex] == "Integer":
+            try:
+                newProp = int(self.prop5V.get())
+            except ValueError:
+                pass
+        elif self.prop5Type[self.filterIndex] == "Float":
+            try:
+                newProp = float(self.prop5V.get())
+            except ValueError:
+                pass
+        elif self.prop5Type[self.filterIndex] == "String":
+            newProp = self.prop5V.get()
+        else:
+            return
+        if val != None:
+            newProp = val
+        if self.prop5Type[self.filterIndex] != "String":
+            # Make sure the input is in the input range
+            if newProp < self.prop5Min[self.filterIndex]:
+                newProp = self.prop5Min[self.filterIndex]
+            if newProp > self.prop5Max[self.filterIndex]:
+                newProp = self.prop5Max[self.filterIndex]
+        # Only update if the value has actually changed
+        if newProp != self.prop5Value[self.filterIndex] or force:
+            # Stop reading during update
+            react = self.reading
+            if recursive:
+                react = recReact
+            self.reading = False
+            if self.busy:
+                self.window.after(1, lambda: self.handle_updateProp5(force=force, recursive=True, recReact=react, val=newProp))
+            else:
+                # Seize Power
+                self.busy = True
+                # Update variable for filter property 5
+                self.prop5Value[self.filterIndex] = newProp
+                # Write command to serial port
+                self.port.writeL("set filterProperty5 " + str(self.prop5Value[self.filterIndex]))
+                self.drawModelCurve()
+                # Update the axes
+                self.updateAxes()
+                # Clear the buffer
+                self.port.clearBuffer()
+                self.readNext = True
+                # Reactivate reading if paused by this function
+                self.reading = react
+                if react:
+                    self.window.after(0, self.readDisp)
+                # resign from power
+                self.busy = False
+        self.prop5V.set(str(self.prop5Value[self.filterIndex]))
+        self.window.update_idletasks()
+    
     # Function to update the model state and its radiobuttons
     def updateModelState(self):
         # Set string variable
@@ -1878,14 +1976,6 @@ class SpectralGUI:
             return
         self.modelState = "H(s)"
         self.updateModelState()
-    
-    # Event handler for arithmetic selector
-    def handle_updateArithmetic(self, event=None):
-        # Set string variable
-        self.arithmeticV.set(self.arithmeticSelect.get())
-        self.arithmetic = self.arithmeticV.get()
-        # Write command to serial port
-        self.port.writeL("set arithmetic " + self.arithmetic)
     
     # Function to draw the modelled transfer function and phase
     def drawModelCurve(self):
@@ -2075,7 +2165,7 @@ class SpectralGUI:
             if self.reactivate:
                 self.handle_switchRead()
         if not self.reading:
-            self.window.after(1, self.checkConnection)
+            self.window.after(10, self.checkConnection)
     
     # Function that handles reading and displaying data from the serial port
     def readDisp(self):
@@ -2090,6 +2180,7 @@ class SpectralGUI:
         if self.readNext:
             self.port.writeL("send data")
             self.readNext = False
+        #L.pln("trying to read")
         # Read raw values
         rawValues = self.port.readB(self.dataSize*4)
         # Only process data, if there was any read
