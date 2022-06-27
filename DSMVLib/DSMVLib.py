@@ -1,5 +1,6 @@
-# 22.06.2022, version 0.2.21
+# 27.06.2022, version 0.2.22
 # Changelog
+#	- 27.07.2022: #Changed serial port functionality to not raise an exception and output a warning instead for writes
 #	- 22.06.2022: Fixed a bug that caused the axis rescaling to not work properly for singular value plots
 #	- 21.06.2022: Added functionality to save the data of a figure as a .csv file,
 #				  added functionality to get all visible plots (lines) from an axis,
@@ -625,7 +626,17 @@ class sPort(Protocol):
 				self.buffer.content = self.buffer.content[newLineIndex+1:len(self.buffer.content)]
 				return retVal
 		return "not enough data"
-
+	
+	# Writes data to the wrapped serial port.
+	def write(self, data):
+		if self.buffer.disconnected:
+			pln("Where are you tryinng to write to? The port is closed!")
+			return
+		try:
+			self.buffer.port.write(data)
+		except OSError:
+			pln("Error in writing (the port is probably closed but hasn't noticed yet)")
+	
 	# Writes a line to the wrapped serial port.
 	def writeL(self, s):
 		if self.buffer.disconnected:
@@ -634,5 +645,4 @@ class sPort(Protocol):
 		try:
 			self.buffer.port.write((s + '\n').encode())
 		except OSError:
-			pln("Error in writing")
-			raise SerialDisconnect
+			pln("Error in writing (the port is probably closed but hasn't noticed yet)")
