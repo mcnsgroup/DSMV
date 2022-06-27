@@ -5,9 +5,14 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 22.06.2022, ver1.22
+# 27.06.2022, ver1.23
 # 
 # Changelog
+#   - 27.06.2022: Fixed a bug that caused the impulse response averaging to not reset,
+#                 changed arithmetic to format of a filter property,
+#                 added automatic normalization index to bandpass filter,
+#                 removed normalized spectrum option for IIR filter,
+#                 fixed a bug that caused the reading to not resume after a reconnect when not in spectral mode
 #   - 22.06.2022: Changed visual appearance to use tabs for all controls,
 #                 added functionality to respect filter window in model for FIR filters
 #   - 21.06.2022: Added arithmetic options for different handlings of modulo,
