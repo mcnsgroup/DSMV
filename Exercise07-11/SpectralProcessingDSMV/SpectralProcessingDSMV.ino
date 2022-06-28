@@ -7,12 +7,12 @@
  *  
  *  @author Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
  *  @author Philipp Rahe (prahe@uos.de)
- *  @date 27.06.2022
- *  @version 1.8
+ *  @date 28.06.2022
+ *  @version 1.9
  *  
  *  @par Changelog
- *  - 27.06.2022: Fixed a bug that caused the IIR-Filter to not use the most recent values correctly,
- *                changed arithmetic to the format of a filter property
+ *  - 28.06.2022: Fixed a bug that caused the IIR-Filter to not use the most recent values correctly
+ *  - 27.06.2022: Changed arithmetic to the format of a filter property
  *  - 21.06.2022: Fixed a bug that caused the updated arithmetic to only be applied to the current filter,
  *                added functionality to configure all different arithmetics via USB command
  *  - 17.06.2022: Added functionality to configure FIR filter arithmetic via USB command,
