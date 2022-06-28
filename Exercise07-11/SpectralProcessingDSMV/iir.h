@@ -15,20 +15,21 @@ float proc_iir(float xn, float props[]) {
   float yn = 0.0;
   // calculate first part of the sum
   for(int i=min(Niirmax, Nb)-1; i>0; i--) {
-    // calculate response
-    yn += bn[i]*xnhist[i];
     // shift values by one
     xnhist[i] = xnhist[i-1];
+    // calculate response
+    yn += bn[i]*xnhist[i];
+    
   }
   // current sample
-  yn += bn[0]*xnhist[0];
   xnhist[0] = xn;
+  yn += bn[0]*xnhist[0];
   // calculate second part of the sum
   for(int i=min(Niirmax, Na)-1; i>1; i--) {
-    // shift values by one
-    ynhist[i-1] = ynhist[i-2];
     // calculate response
     yn -= an[i]*ynhist[i-1];
+    // shift values by one
+    ynhist[i-1] = ynhist[i-2];
   }
   yn -= an[1]*ynhist[0];
   ynhist[0] = yn;
