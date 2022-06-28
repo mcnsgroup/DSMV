@@ -12,11 +12,15 @@ uint16_t fir_bufPos = 0;                      /**< Current position in the data 
 double phi = 0;     /**< Digital filter frequency. */
 double phihigh = 0; /**< Digital filter frequency. */
 
-#define rectWin     0       /**< Rectangle window. */
-#define hammingWin  1       /**< Hamming window. */
-#define integerArithmetic 0 /**< Integer arithmetic. */
-#define floatArithmetic 1   /**< Float arithmetic. */
-#define coeffPrec 9         /**< Precision (bits) of the FIR filter coefficients for integer arithmetic. */
+#define rectWin     0         /**< Rectangle window. */
+#define hammingWin  1         /**< Hamming window. */
+#define integerDoubleBuffer 0 /**< Integer arithmetic with a double sized buffer. */
+#define integerIfModulo 1     /**< Integer arithmetic with an if based modulo. */
+#define integerModulo 2       /**< Integer arithmetic with a regular modulo. */
+#define floatDoubleBuffer 3   /**< Float arithmetic with a double sized buffer. */
+#define floatIfModulo 4       /**< Float arithmetic with an if based modulo. */
+#define floatModulo 5         /**< Float arithmetic with a regular modulo. */
+#define coeffPrec 9           /**< Precision (bits) of the FIR filter coefficients for integer arithmetic. */
 
 /** @brief Multiplies a value by its factor from a window function.
  *  
@@ -153,10 +157,10 @@ void init_fir(uint8_t type, float props[]) {
  *      props[2] holds the filter order
  *      props[4] holds the arithmetic, currently supported are:
  *         integerArihtmetic  integer arithmetic
- *         floatArithmetic  float arithmetic
+ *         floatDoubleBuffer  float arithmetic
  *  @param arithmetic arithmetic to be used for computation of the result, currently supported are:
- *    integerArithmetic integer arithmetic
- *    floatArithmetic float arithmetic
+ *    integerDoubleBuffer integer arithmetic
+ *    floatDoubleBuffer float arithmetic
  *  @return Resulting signal value
  */
 float proc_fir(float xn, int32_t xnRaw, float props[]) {
@@ -171,42 +175,62 @@ float proc_fir(float xn, int32_t xnRaw, float props[]) {
   float filtered = 0;
   //int64_t filteredInt = 0;
   int32_t filteredInt = 0;
+  // Measure timing
+  T4toggle(LED_3);
   switch((int) props[4]) {
-    case integerArithmetic: // Measure timing
-    						            //T4toggle(LED_3);
-                            for(int i = 0; i < Nfilter; i++) {
-                              // Computation using if based modulo
-                              /*if(fir_bufPos + i >= Nfilter) {
-                                filteredInt += dataBufferInt[fir_bufPos + i - Nfilter] * filtercoeffInt[i];
+    case integerDoubleBuffer: for(int i = 0; i < Nfilter; i++) {
+                                filteredInt += dataBufferInt[fir_bufPos + i] * filtercoeffInt[i];
                               }
-                              else {
-                                filteredInt += dataBufferInt[(fir_bufPos + i)] * filtercoeffInt[i];
-                              }*/
-                              // Computation using double buffer
-                              filteredInt += dataBufferInt[fir_bufPos + i] * filtercoeffInt[i];
-                            }
-                            //T4toggle(LED_3);
-                            // Shift by factor of the coefficient array
-                            filtered = filteredInt >> 7;
-                            // Convert into a voltage
-                            filtered = RES_LTC2500 * filtered; 
-                            // Offset/gain correction
-                            filtered = filtered * gainLTC2500 + offsetLTC2500;
-                            break;
-    case floatArithmetic:   // Measure timing
-    						            //T4toggle(LED_3);
-                            for(int i = 0; i < Nfilter; i++) {
-                              // Computation using if based modulo
-                              /*if(fir_bufPos + i >= Nfilter) {
-                                filtered += dataBuffer[fir_bufPos + i - Nfilter] * filtercoeff[i];
+                              // Shift by factor of the coefficient array
+                              filtered = filteredInt >> 7;
+                              // Convert into a voltage
+                              filtered = RES_LTC2500 * filtered; 
+                              // Offset/gain correction
+                              filtered = filtered * gainLTC2500 + offsetLTC2500;
+                              break;
+    case integerIfModulo:     for(int i = 0; i < Nfilter; i++) {
+                                if(fir_bufPos + i >= Nfilter) {
+                                  filteredInt += dataBufferInt[fir_bufPos + i - Nfilter] * filtercoeffInt[i];
+                                }
+                                else {
+                                  filteredInt += dataBufferInt[(fir_bufPos + i)] * filtercoeffInt[i];
+                                }
                               }
-                              else {
-                                filtered += dataBuffer[(fir_bufPos + i)] * filtercoeff[i];
-                              }*/
-                              // Computation using double buffer
-                              filtered += dataBuffer[fir_bufPos + i] * filtercoeff[i];
-                            }
-                            //T4toggle(LED_3);
+                              // Shift by factor of the coefficient array
+                              filtered = filteredInt >> 7;
+                              // Convert into a voltage
+                              filtered = RES_LTC2500 * filtered; 
+                              // Offset/gain correction
+                              filtered = filtered * gainLTC2500 + offsetLTC2500;
+                              break;
+    case integerModulo:       for(int i = 0; i < Nfilter; i++) {
+                                filteredInt += dataBufferInt[(fir_bufPos + i) % Nfilter] * filtercoeffInt[i];
+                              }
+                              // Shift by factor of the coefficient array
+                              filtered = filteredInt >> 7;
+                              // Convert into a voltage
+                              filtered = RES_LTC2500 * filtered; 
+                              // Offset/gain correction
+                              filtered = filtered * gainLTC2500 + offsetLTC2500;
+                              break;
+    case floatDoubleBuffer:   for(int i = 0; i < Nfilter; i++) {
+                                filtered += dataBuffer[fir_bufPos + i] * filtercoeff[i];
+                              }
+                              break;
+    case floatIfModulo:       for(int i = 0; i < Nfilter; i++) {
+                                if(fir_bufPos + i >= Nfilter) {
+                                  filtered += dataBuffer[fir_bufPos + i - Nfilter] * filtercoeff[i];
+                                }
+                                else {
+                                  filtered += dataBuffer[(fir_bufPos + i)] * filtercoeff[i];
+                                }
+                              }
+                              break;
+    case floatModulo:         for(int i = 0; i < Nfilter; i++) {
+                                filtered += dataBuffer[(fir_bufPos + i) % Nfilter] * filtercoeff[i];
+                              }
+                              break;
   }
+  T4toggle(LED_3);
   return filtered;
 }
