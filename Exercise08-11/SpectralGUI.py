@@ -17,10 +17,11 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 29.06.2022, ver1.25
+# 29.06.2022, ver1.25.1
 # 
 # Changelog
-#   - 29.06.2022: Fixed a bug that caused a command to not be read by the board sometimes
+#   - 29.06.2022: Fixed a bug that caused a command to not be read by the board sometimes,
+#                 fixed a bug that caused the arithmetic to not be set correctly
 #   - 28.06.2022: Fixed a bug that caused a filter property entry box to be displayed for the IIR filter,
 #                 changed normalization for filters with no index to maximum,
 #                 changed y-axis label for normalized spectrum to |H(f)|
@@ -189,7 +190,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.25")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.25.1")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -1605,6 +1606,8 @@ class SpectralGUI:
                     self.prop1V.set(self.prop1Value[k])
                     self.prop2V.set(self.prop2Value[k])
                     self.prop3V.set(self.prop3Value[k])
+                    self.prop4V.set(self.prop4Value[k])
+                    self.prop5V.set(self.prop5Value[k])
                     self.windowSelect.set(str(self.prop4Value[k]))
                     self.arithmeticSelect.set(str(self.prop5Value[k]))
                     self.updateModelFilter()
