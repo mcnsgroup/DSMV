@@ -5,10 +5,11 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 29.06.2022, ver1.25
+# 29.06.2022, ver1.25.1
 # 
 # Changelog
-#   - 29.06.2022: Fixed a bug that caused a command to not be read by the board sometimes
+#   - 29.06.2022: Fixed a bug that caused a command to not be read by the board sometimes,
+#                 fixed a bug that caused the arithmetic to not be set correctly
 #   - 28.06.2022: Fixed a bug that caused a filter property entry box to be displayed for the IIR filter,
 #                 changed normalization for filters with no index to maximum,
 #                 changed y-axis label for normalized spectrum to |H(f)|
