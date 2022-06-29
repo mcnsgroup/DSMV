@@ -17,9 +17,13 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 27.06.2022, ver1.23
+# 29.06.2022, ver1.25
 # 
 # Changelog
+#   - 29.06.2022: Fixed a bug that caused a command to not be read by the board sometimes
+#   - 28.06.2022: Fixed a bug that caused a filter property entry box to be displayed for the IIR filter,
+#                 changed normalization for filters with no index to maximum,
+#                 changed y-axis label for normalized spectrum to |H(f)|
 #   - 27.06.2022: Fixed a bug that caused the impulse response averaging to not reset,
 #                 changed arithmetic to format of a filter property,
 #                 added automatic normalization index to bandpass filter,
@@ -185,7 +189,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.23")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.25")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -329,12 +333,11 @@ class SpectralGUI:
         self.psLabel = "$\mathrm{PS\/ S}^\mathrm{V}\mathrm{\/(V}^2\mathrm{)}$"
         self.asdLabel = "$\mathrm{ASD\/ d}^\mathrm{V}\mathrm{\/(V}^2\mathrm{/}\sqrt{\mathrm{Hz}}\mathrm{)}$"
         self.asLabel = "$\mathrm{AS\/ s}^\mathrm{V}\mathrm{\/(V)}$"
-        self.normLabel = "|A(f)| (normalized)"
+        self.normLabel = "|H(f)| (normalized)"
         # List of different spectrum unit labels
         self.unitLabels = [self.psdLabel, self.psLabel, self.asdLabel, self.asLabel, self.normLabel]
         # List of different spectrum units
         self.unitList = ["Power Spectral Density", "Power Spectrum", "Amplitude Spectral Density", "Amplitude Spectrum", "Normalized Spectrum"]
-        self.unitListReduced = ["Power Spectral Density", "Power Spectrum", "Amplitude Spectral Density", "Amplitude Spectrum"]
         # Create combo box for spectrum unit selector
         self.unitSelect = ttk.Combobox(master=self.avgUnitFrame, values=self.unitList, state="readonly")
         self.uiElements.append(self.unitSelect)
@@ -499,19 +502,19 @@ class SpectralGUI:
         self.prop1Names = ["Gain", "Number of samples", "Cutoff frequency", "Cutoff frequency", "Lower frequency",
                            "Lower frequency", "Cutoff frequency", "Cutoff frequency", "Cutoff frequency", "Cutoff frequency", ""]
         # Visibility of filter property 1
-        self.prop1Visible = [True, True, True, True, True, True, True, True, True, True, True]
+        self.prop1Visible = [True, True, True, True, True, True, True, True, True, True, False]
         # Create label for the filter property 1 entry box
         self.prop1Label = Label(master=self.filterFrame, text=self.prop1Names[filterDefIndex])
         self.uiElements.append(self.prop1Label)
         self.uiGridParams.append([1, 0, 1, 1, "E"])
         # Value type for the filter property 1
-        self.prop1Type = ["Float", "Integer", "Float", "Float", "Float", "Float", "Float", "Float", "Float", "Float", "Float"]
+        self.prop1Type = ["Float", "Integer", "Float", "Float", "Float", "Float", "Float", "Float", "Float", "Float", ""]
         # Default values for the filter property 1 (later current values)
-        self.prop1Value = [1.0, 1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.prop1Value = [1.0, 1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, None]
         # Minimum values for the filter property 1
-        self.prop1Min = [-np.inf, 1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.prop1Min = [-np.inf, 1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, None]
         # Maximum values for the filter property 1
-        self.prop1Max = [np.inf, 256, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf]
+        self.prop1Max = [np.inf, 256, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, None]
         # Variable to control content of the filter property 1 entry box
         self.prop1V = StringVar()
         self.prop1V.set(str(self.prop1Value[filterDefIndex]))
@@ -956,27 +959,21 @@ class SpectralGUI:
         self.waitLabel.configure(text=pre + "\\")
         self.window.update_idletasks()
         self.handle_updateFreq(force=True)
-        time.sleep(0.005)
         self.waitLabel.configure(text=pre + "|")
         self.window.update_idletasks()
         self.handle_updateSize(force=True)
-        time.sleep(0.005)
         self.waitLabel.configure(text=pre + "/")
         self.window.update_idletasks()
         self.handle_updateOvers(force=True)
-        time.sleep(0.005)
         self.waitLabel.configure(text=pre + "-")
         self.window.update_idletasks()
         self.handle_updateMode()
-        time.sleep(0.005)
         self.waitLabel.configure(text=pre + "\\")
         self.window.update_idletasks()
         self.handle_updateProc(force=True)
-        time.sleep(0.005)
         self.waitLabel.configure(text=pre + "|")
         self.window.update_idletasks()
         self.handle_updateFilter()
-        time.sleep(0.005)
         self.waitLabel.grid_forget()
     
     # Event handler for operation mode selector
@@ -996,12 +993,12 @@ class SpectralGUI:
             self.busy = True
             # Update the mode
             self.mode = newMode
+            time.sleep(0.005)
             self.port.writeL('deactivate AD4020')
-            time.sleep(0.01)
+            time.sleep(0.005)
             self.port.writeL('deactivate LTC2500')
-            time.sleep(0.01)
+            time.sleep(0.005)
             self.port.writeL('deactivate Internal ADC')
-            time.sleep(0.01)
             if self.mode == "AD4020 spectral analysis":
                 self.ax1.set_ylabel("Voltage AD4020 (V)")
                 self.spectral = True
@@ -1017,7 +1014,6 @@ class SpectralGUI:
                 self.ax1.set_ylabel("Voltage AD4020 (V)")
                 self.samplerateV.set(self.procV.get())
                 self.handle_updateFreq()
-                time.sleep(0.01)
                 self.freqEntry["state"] = DISABLED
                 self.windowSelect1.set("Rectangle")
                 self.windowSelect2.set("Disabled")
@@ -1046,6 +1042,7 @@ class SpectralGUI:
                 self.modelHsButton["state"] = DISABLED
                 self.legendImpulse.set_visible(False)
                 self.handle_modelDis()
+            time.sleep(0.005)
             self.port.writeL('set mode ' + str(self.mode))
             self.port.clearBuffer()
             self.readNext = True
@@ -1084,6 +1081,7 @@ class SpectralGUI:
                     # Update variable for samplerate
                     self.samplerate = newSamplerate
                     # Write command to serial port
+                    time.sleep(0.005)
                     self.port.writeL('set samplerate ' + str(self.samplerate))
                     # Update the axes
                     self.updateAxes()
@@ -1135,6 +1133,7 @@ class SpectralGUI:
                     # Update variable for data size
                     self.dataSize = newSize
                     # Write command to serial port
+                    time.sleep(0.005)
                     self.port.writeL('set dataSize ' + str(self.dataSize))
                     # If transform size entry box is disabled, overwrite the value
                     if self.transformSizeStatus.get() == "N_FT-1=N/2":
@@ -1183,6 +1182,7 @@ class SpectralGUI:
                     # Update variable for oversamples
                     self.oversamples = newOvers
                     # Write command to serial port
+                    time.sleep(0.005)
                     self.port.writeL('set oversamples ' + str(self.oversamples))
                     # Update the axes
                     self.updateAxes()
@@ -1225,6 +1225,7 @@ class SpectralGUI:
                     # Update variable for samplerate
                     self.proc = newProc
                     # Write command to serial port
+                    time.sleep(0.005)
                     self.port.writeL('set processing rate ' + str(self.proc))
                     # Update the axes
                     self.updateAxes()
@@ -1238,9 +1239,6 @@ class SpectralGUI:
                     # resign from power
                     self.busy = False
                     if not self.spectral:
-                        time.sleep(0.005)
-                        #self.samplerateV.set(self.procV.get())
-                        #self.window.update_idletasks()
                         self.handle_updateFreq(force=force, val=self.proc)
         except ValueError:
             pass
@@ -1388,8 +1386,8 @@ class SpectralGUI:
             S2 = np.divide(self.S2Pre, self.averaged)
         elif self.unitSelect.get() == "Normalized Spectrum":
             if self.normIndex[self.filterIndex] == None:
-                S1 = self.S1Pre
-                S2 = self.S2Pre
+                S1 = np.divide(self.S1Pre, max(self.S1Pre))
+                S2 = np.divide(self.S2Pre, max(self.S2Pre))
             else:
                 S1 = np.divide(self.S1Pre, self.S1Pre[self.normIndex[self.filterIndex]])
                 S2 = np.divide(self.S2Pre, self.S2Pre[self.normIndex[self.filterIndex]])
@@ -1610,6 +1608,7 @@ class SpectralGUI:
                     self.windowSelect.set(str(self.prop4Value[k]))
                     self.arithmeticSelect.set(str(self.prop5Value[k]))
                     self.updateModelFilter()
+            time.sleep(0.005)
             self.port.writeL("set filter " + newFilter)
             self.resetYSpectra()
             # Clear the buffer
@@ -1621,24 +1620,11 @@ class SpectralGUI:
                 self.window.after(0, self.readDisp)
             # resign from power
             self.busy = False
-            # Possibly adjust spectral unit
-            if newFilter == "Programmable IIR filter":
-                self.unitSelect["values"] = self.unitListReduced
-                if self.unitSelect.get() == "Normalized Spectrum":
-                    self.unitSelect.set("Amplitude Spectrum")
-                    self.handle_updateUnit()
-            else:
-                self.unitSelect["values"] = self.unitList
             # Update all filter properties
-            time.sleep(0.005)
             self.handle_updateProp1(force=True)
-            time.sleep(0.005)
             self.handle_updateProp2(force=True)
-            time.sleep(0.005)
             self.handle_updateProp3(force=True)
-            time.sleep(0.005)
             self.handle_updateWindow(force=True)
-            time.sleep(0.005)
             self.handle_updateArithmetic(force=True)
     
     # Event handler for filter property 1 entry box
@@ -1682,6 +1668,7 @@ class SpectralGUI:
                 # Update variable for filter property 1
                 self.prop1Value[self.filterIndex] = newProp
                 # Write command to serial port
+                time.sleep(0.005)
                 self.port.writeL("set filterProperty1 " + str(self.prop1Value[self.filterIndex]))
                 self.drawModelCurve()
                 # Update the axes
@@ -1739,6 +1726,7 @@ class SpectralGUI:
                 # Update variable for filter property 2
                 self.prop2Value[self.filterIndex] = newProp
                 # Write command to serial port
+                time.sleep(0.005)
                 self.port.writeL("set filterProperty2 " + str(self.prop2Value[self.filterIndex]))
                 self.drawModelCurve()
                 # Update the axes
@@ -1798,6 +1786,7 @@ class SpectralGUI:
                 # Update variable for filter property 3
                 self.prop3Value[self.filterIndex] = newProp
                 # Write command to serial port
+                time.sleep(0.005)
                 self.port.writeL("set filterProperty3 " + str(self.prop3Value[self.filterIndex]))
                 self.drawModelCurve()
                 # Update the axes
@@ -1860,6 +1849,7 @@ class SpectralGUI:
                 # Update variable for filter property 4
                 self.prop4Value[self.filterIndex] = newProp
                 # Write command to serial port
+                time.sleep(0.005)
                 self.port.writeL("set filterProperty4 " + str(self.prop4Value[self.filterIndex]))
                 self.drawModelCurve()
                 # Update the axes
@@ -1922,6 +1912,7 @@ class SpectralGUI:
                 # Update variable for filter property 5
                 self.prop5Value[self.filterIndex] = newProp
                 # Write command to serial port
+                time.sleep(0.005)
                 self.port.writeL("set filterProperty5 " + str(self.prop5Value[self.filterIndex]))
                 self.drawModelCurve()
                 # Update the axes
@@ -2154,7 +2145,6 @@ class SpectralGUI:
             self.window.update_idletasks()
         # Restore settings on reconnect
         if self.disconnected and not self.port.disconnected():
-            time.sleep(0.01)
             self.updateAll(False)
             self.waitLabel.grid_forget()
             L.buildUI(self.uiElements, self.uiGridParams)
@@ -2178,6 +2168,7 @@ class SpectralGUI:
         # Read data from the serial port (if enough is available)
         # Issue command to board to send data
         if self.readNext:
+            time.sleep(0.005)
             self.port.writeL("send data")
             self.readNext = False
         #L.pln("trying to read")
