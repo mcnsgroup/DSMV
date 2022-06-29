@@ -5,9 +5,13 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 27.06.2022, ver1.23
+# 29.06.2022, ver1.25
 # 
 # Changelog
+#   - 29.06.2022: Fixed a bug that caused a command to not be read by the board sometimes
+#   - 28.06.2022: Fixed a bug that caused a filter property entry box to be displayed for the IIR filter,
+#                 changed normalization for filters with no index to maximum,
+#                 changed y-axis label for normalized spectrum to |H(f)|
 #   - 27.06.2022: Fixed a bug that caused the impulse response averaging to not reset,
 #                 changed arithmetic to format of a filter property,
 #                 added automatic normalization index to bandpass filter,
