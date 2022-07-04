@@ -77,12 +77,12 @@ float* proc_iir(float xn[], float props[]) {
   yn[1] += bn[0]*xnhist[1][0];
   // calculate second part of the sum
   for(int i=min(Niirmax, Na)-1; i>1; i--) {
-    // shift values by one
-    ynhist[0][i-1] = ynhist[0][i-2];
-    ynhist[1][i-1] = ynhist[1][i-2];
     // calculate response
     yn[0] -= an[i]*ynhist[0][i-1];
     yn[1] -= an[i]*ynhist[1][i-1];
+    // shift values by one
+    ynhist[0][i-1] = ynhist[0][i-2];
+    ynhist[1][i-1] = ynhist[1][i-2];
   }
   yn[0] -= an[1]*ynhist[0][0];
   yn[1] -= an[1]*ynhist[1][0];
