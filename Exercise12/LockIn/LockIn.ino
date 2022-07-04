@@ -6,10 +6,12 @@
  *  
  *  @author Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
  *  @author Philipp Rahe (prahe@uos.de)
- *  @date 29.06.2021
- *  @version 1.3
+ *  @date 04.07.2021
+ *  @version 1.4
  *  
  *  @par Changelog
+ *  - 04.07.2022: Fixed a bug that caused the IIR filter to shift history values before calculating,
+ *                fixed a bug that caused the reference output signal to break at longer time values due to float inaccuracy
  *  - 29.06.2022: Moved filters to individual files and made them configurable via USB-protocol,
  *                Added command for sending data to PC to USB protocol,
  *                translated documentation to English
@@ -199,7 +201,8 @@ void inputFilterOutput() {
   // Offset/gain correction
   float value = value1 * gainLTC2500 + offsetLTC2500;
   // Calculate the current values of the reference and shifted reference signal
-  float t = T4getTime();
+  double t = fmod(T4getTime(), (double) 1.0/reffreq);
+  
   float refSig = sin(2*PI*reffreq*t+phaseoffset/360.0*2*PI);
   float refSigShift = sin(2*PI*reffreq*t+(phaseoffset-90.0)/360.0*2*PI);
   // Output the current value of the reference signal times 5 (why do we do this again?)
