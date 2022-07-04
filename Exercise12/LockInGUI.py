@@ -17,9 +17,15 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # philipp Rahe (prahe@uni-osnabrueck.de)
-# 28.06.2022, ver1.3
+# 04.07.2022, ver1.4
 # 
 # Changelog:
+#   - 04.07.2022: UI appearance changes,
+#                 added option to use Lock-In as one phase only,
+#                 added legends to display average and standard deviation for time series of R and phi,
+#                 lowered maximum reference frequency to comply with nyquist theorem,
+#                 fixed a bug that caused the zoom setting to not update on a keypad return and focus out,
+#                 fixed a bug that caused the time series of phi to use the wrong unit
 #   - 28.06.2022: Rebuilt from SpectralGUI.py
 #   - 31.03.2022: Ported to Python
 #	- 07.07.2021: first version
@@ -49,6 +55,7 @@ import numpy as np
 from matplotlib.pyplot import *
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+#import mplcursors
 from tkinter import *
 from tkinter import ttk
 import struct
@@ -99,7 +106,7 @@ class LockInGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 12\nv1.3")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 12\nv1.4")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -132,9 +139,9 @@ class LockInGUI:
         # Minimum reference frequency
         self.refMin = 1
         # Maximum reference frequency
-        self.refMax = 80000
+        self.refMax = 10000
         # Create label for the phase offset entry box
-        self.offsetLabel = Label(master=self.boardFrame, text="Phase offset (°)")
+        self.offsetLabel = Label(master=self.boardFrame, text="Phi_offset (°)")
         self.uiElements.append(self.offsetLabel)
         self.uiGridParams.append([4, 0, 1, 1, "E"])
         # Variable to control content of the phase offset entry box
@@ -157,7 +164,7 @@ class LockInGUI:
         self.refrenceV = StringVar()
         self.refrenceV.set(self.reference)
         # Create label for the reference signal selector
-        self.refrenceLabel = Label(master=self.boardFrame, text="Reference signal")
+        self.refrenceLabel = Label(master=self.boardFrame, text="Reference")
         self.uiElements.append(self.refrenceLabel)
         self.uiGridParams.append([5, 0, 1, 1, "E"])
         # Create frame for the reference signal selector
@@ -180,9 +187,9 @@ class LockInGUI:
         # Create frame for the display settings
         self.displayFrame = Frame(master=self.displayFilterTBS)
         self.displayFilterTBS.add(self.displayFrame, text='Display settings')
-        self.displayFrame.columnconfigure((2, 3), weight=1)
+        self.displayFrame.columnconfigure(1, weight=1)
         # Create label for the zoom entry box
-        self.zoomLabel = Label(master=self.displayFrame, text="Zoom for Polar Plot")
+        self.zoomLabel = Label(master=self.displayFrame, text="Polar Plot: R_max")
         self.uiElements.append(self.zoomLabel)
         self.uiGridParams.append([0, 0, 1, 1, "E"])
         # Variable to control content of the zoom entry box
@@ -193,12 +200,14 @@ class LockInGUI:
         self.uiElements.append(self.zoomEntry)
         self.uiGridParams.append([0, 1, 1, 1, "WE"])
         self.zoomEntry.bind("<Return>", self.handle_updateZoom)
+        self.zoomEntry.bind("<KP_Enter>", self.handle_updateZoom)
+        self.zoomEntry.bind("<FocusOut>", self.handle_updateZoom)
         # Minimum zoom
         self.zoomMin = 1e-10
         # Maximum zoom
         self.zoomMax = 10
         # Create label for the data size entry box
-        self.sizeLabel = Label(master=self.displayFrame, text="N")
+        self.sizeLabel = Label(master=self.displayFrame, text="Time series: N_values")
         self.uiElements.append(self.sizeLabel)
         self.uiGridParams.append([1, 0, 1, 1, "E"])
         # Variable to control content of the data size entry box
@@ -215,6 +224,28 @@ class LockInGUI:
         self.dataSizeMin = 1
         # Maximum data size
         self.dataSizeMax = 32768
+        # Value for phase state
+        self.phase = "two-phase"
+        # String variable for phase state
+        self.phaseV = StringVar()
+        self.phaseV.set(self.phase)
+        # Create label for the phase selector
+        self.phaseLabel = Label(master=self.displayFrame, text="Phase")
+        self.uiElements.append(self.phaseLabel)
+        self.uiGridParams.append([2, 0, 1, 1, "E"])
+        # Create frame for the phase selector
+        self.phaseFrame = Frame(master=self.displayFrame)
+        self.uiElements.append(self.phaseFrame)
+        self.uiGridParams.append([2, 1, 1, 1, "NESW"])
+        # Create phase selector buttons
+        self.onePhaseButton = Radiobutton(self.phaseFrame, text="one-phase", variable=self.phaseV, value="one-phase")
+        self.uiElements.append(self.onePhaseButton)
+        self.uiGridParams.append([0, 0, 1, 1, "E"])
+        self.onePhaseButton.bind("<Button-1>", self.handle_onePhase)
+        self.twoPhaseButton = Radiobutton(self.phaseFrame, text="two-phase", variable=self.phaseV, value="two-phase")
+        self.uiElements.append(self.twoPhaseButton)
+        self.uiGridParams.append([0, 1, 1, 1, "W"])
+        self.twoPhaseButton.bind("<Button-1>", self.handle_twoPhase)
         # Create frame for the filter settings
         self.filterFrame = Frame(master=self.displayFilterTBS)
         self.displayFilterTBS.add(self.filterFrame, text='Filter settings')
@@ -223,7 +254,7 @@ class LockInGUI:
         self.filterFrame.columnconfigure((1, 3), weight=1)
         # Create frame for the individual widgets
         # Create label for the signal filter selector
-        self.filterSelectLabel = Label(master=self.filterFrame, text="Signal Filter")
+        self.filterSelectLabel = Label(master=self.filterFrame, text="Output Filter")
         self.uiElements.append(self.filterSelectLabel)
         self.uiGridParams.append([0, 0, 1, 1, "E"])
         # List of different signal filters
@@ -377,6 +408,7 @@ class LockInGUI:
         self.uiElements.append(canvas0.get_tk_widget())
         self.uiGridParams.append([1, 0, 1, 2, "NESW"])
         # Create data tip for the polar plot - this is not ready yet as DSMVLib doesn't support polar plots yet
+        #self.dataTip0 = mplcursors.cursor(self.dPoint)
         #self.dataTip0 = L.dataTip(canvas0, self.ax0, 0.01, faceColor="b")
         # Create frame for saving the plot
         self.saveFrame0 = Frame()
@@ -419,8 +451,8 @@ class LockInGUI:
         # Create R time series
         self.R, = self.ax1.plot(self.x, self.data[0], 'b.-', label="R (V)", linewidth=0.5)
         # Legend for R time series
-        self.legendR = self.ax1.legend(loc="upper right", title="Time series legend for R or something")
-        self.legendR.set_visible(False)
+        self.legendR = self.ax1.legend(loc='upper right', title="Average: 0V \nStandard deviation: 0V")
+        self.legendR.get_title().set_multialignment('center')
         # Create the canvas
         canvas1 = FigureCanvasTkAgg(self.fig1)
         canvas1.draw()
@@ -466,9 +498,9 @@ class LockInGUI:
         self.ax2.set_xlim([-self.dataSize, 0])
         # Create phi time series
         self.phi, = self.ax2.plot(self.x, self.data[1], 'b.-', label="$\phi$ (°)", linewidth=0.5)
-        # Legend for R time series
-        self.legendphi = self.ax2.legend(loc="upper right", title="Time series legend for phi or something")
-        self.legendphi.set_visible(False)
+        # Legend for phi time series
+        self.legendphi = self.ax2.legend(loc='upper right', title="Average: 0° \nStandard deviation: 0°")
+        self.legendphi.get_title().set_multialignment('center')
         # Draw the canvas
         canvas2 = FigureCanvasTkAgg(self.fig2)
         canvas2.draw()
@@ -739,6 +771,39 @@ class LockInGUI:
             pass
         self.zoomV.set(str(self.zoom))
         self.window.update_idletasks()
+    
+    # Function to update the phase state and its radiobuttons
+    def updatePhase(self):
+        # Set string variable
+        self.phaseV.set(self.phase)
+    
+    # Callback function for changing the phase to "one-phase"
+    def handle_onePhase(self, event=None):
+        # Don't change state if button is disabled
+        if self.onePhaseButton["state"] == DISABLED:
+            return
+        self.phase = "one-phase"
+        self.phi.set_visible(False)
+        self.legendphi.set_visible(False)
+        self.dPoint.set_visible(False)
+        self.dLine.set_visible(False)
+        self.circle.set_visible(False)
+        #self.refEntry["state"] = NORMAL
+        self.updatePhase()
+    
+    # Callback function for changing the phase to "two-phase"
+    def handle_twoPhase(self, event=None):
+        # Don't change state if button is disabled
+        if self.twoPhaseButton["state"] == DISABLED:
+            return
+        self.phase = "two-phase"
+        self.phi.set_visible(True)
+        self.legendphi.set_visible(True)
+        self.dPoint.set_visible(True)
+        self.dLine.set_visible(True)
+        self.circle.set_visible(True)
+        #self.refEntry["state"] = NORMAL
+        self.updatePhase()
     
     # Event handler for signal filter selector
     def handle_updateFilter(self, event=None, recursive=False, recReact=False, val=None):
@@ -1046,7 +1111,7 @@ class LockInGUI:
             self.data[1] = self.data[1][1:self.dataSize]
             # Add the latest values to the end of the array
             self.data[0] = np.append(self.data[0], R)
-            self.data[1] = np.append(self.data[1], phi)
+            self.data[1] = np.append(self.data[1], phi * 180/np.pi)
             # Display the values
             self.R.set_ydata(self.data[0])
             self.phi.set_ydata(self.data[1])
@@ -1055,7 +1120,12 @@ class LockInGUI:
             self.dPoint.set_ydata(R)
             self.dLine.set_xdata([phi, phi])
             self.dLine.set_ydata([0, R])
-            self.currentValues.set_text("R=" + L.fstr(R) + "V\n$\phi$=" + L.fstr(phi*180/np.pi) + "°\nX=" + L.fstr(X) + "V\nY=" + L.fstr(Y) + "V")
+            phiStr = ""
+            if self.phase == "two-phase":
+                phiStr = "\n$\phi$=" + L.fstr(phi*180/np.pi)
+            self.currentValues.set_text("R=" + L.fstr(R) + "V" + phiStr + "°\nX=" + L.fstr(X) + "V\nY=" + L.fstr(Y) + "V")
+            self.legendR.set_title("Average: " + L.fstr(np.mean(self.data[0])) + "V\nStandard deviation: " + L.fstr(np.std(self.data[0]), 3) + "V")
+            self.legendphi.set_title("Average: " + L.fstr(np.mean(self.data[1])) + "°\nStandard deviation: " + L.fstr(np.std(self.data[1]), 3) + "°")
             # Update the canvases
             L.updateCanvas(self.fig0.canvas, self.ax0, False, False)
             L.updateCanvas(self.fig1.canvas, self.ax1, False, True)
