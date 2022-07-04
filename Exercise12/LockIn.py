@@ -5,9 +5,15 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 28.06.2022, ver1.3
+# 04.07.2022, ver1.4
 # 
 # Changelog:
+#   - 04.07.2022: UI appearance changes,
+#                 added option to use Lock-In as one phase only,
+#                 added legends to display average and standard deviation for time series of R and phi,
+#                 lowered maximum reference frequency to comply with nyquist theorem,
+#                 fixed a bug that caused the zoom setting to not update on a keypad return and focus out,
+#                 fixed a bug that caused the time series of phi to use the wrong unit
 #   - 28.06.2022: Rebuilt from SpectralGUI.py
 #   - 31.03.2022: Ported to Python
 #	- 07.07.2021: first version
