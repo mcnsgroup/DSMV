@@ -196,6 +196,8 @@ void updateFilter() {
 /** @brief Interrupt routine for the Lock-In amplifier
  */
 void inputFilterOutput() {
+  // Start ISR timing
+  T4dw(LED_3, HIGH); 
   // Read most recent value
   int32_t value1 = LTC2500readValue();
   // Offset/gain correction
@@ -204,16 +206,17 @@ void inputFilterOutput() {
   double t = fmod(T4getTime(), (double) 1.0/reffreq);
   
   float refSig = sin(2*PI*reffreq*t+phaseoffset/360.0*2*PI);
+  float refSigOut = sin(2*PI*reffreq*t);
   float refSigShift = sin(2*PI*reffreq*t+(phaseoffset-90.0)/360.0*2*PI);
   // Output the current value of the reference signal times 5 (why do we do this again?)
-  AD5791setVoltage(5.0*refSig);
+  AD5791setVoltage(5.0*refSigOut);
   // Arrays to hold input values for filters
   float values[2] = {value * refSig, value * refSigShift};
   int32_t valuesRaw[2] = {value * refSig, value * refSigShift};
   // Array for filtered values
   float* filtered;
   // Apply low pass filter
-  T4dw(LED_2, HIGH);  // Start filter timing
+  T4dw(LED_2, HIGH);  
   switch(filter) {
     case IIRlow:  filtered = proc_iir(values, filterProperties[filter]);
                   break;
@@ -222,10 +225,11 @@ void inputFilterOutput() {
     case INVALID: filtered = values;
                   break;
   }
-  T4dw(LED_2, LOW);   // Stop filter timing
   // Convert values into voltages and divide values by half factor of the filter
   voltage1 = filtered[0] * RES_LTC2500 * 2;
   voltage2 = filtered[1] * RES_LTC2500 * 2;
+  // Stop ISR timing
+  T4dw(LED_3, LOW); 
 }
 
 /** @brief Sends buffers to PC once they are full
