@@ -1,0 +1,11 @@
+/*! 
+@mainpage DSMV_Board
+This library includes the pin definitions for the <b>DSMV board</b> used in the course "digital signal- and measurement data processing".
+
+@section DSMV_board DSMV board .
+
+All definitions are in DSMV_Board.h
+
+@see DSMV_Board.h 
+
+*/
