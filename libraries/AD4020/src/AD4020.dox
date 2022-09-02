@@ -1,0 +1,11 @@
+/*! 
+@mainpage AD4020
+Library for using an <b>AD4020</b> with a <b>Teensy</b> 4.0 via SPI. Used in the course "digital signal- and measurement data processing".
+
+@section AD4020 AD4020.
+
+All definitions are in AD4020.h
+
+@see AD4020.h 
+
+*/
