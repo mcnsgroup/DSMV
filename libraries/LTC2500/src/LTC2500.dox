@@ -1,0 +1,11 @@
+/*! 
+@mainpage LLTC2500
+Library for using an <b>LTC2500</b> with a <b>Teensy</b> 4.0 via SPI. Used in the course "digital signal- and measurement data processing".
+
+@section LTC2500 LTC2500.
+
+All definitions are in LTC2500.h
+
+@see LTC2500.h 
+
+*/
