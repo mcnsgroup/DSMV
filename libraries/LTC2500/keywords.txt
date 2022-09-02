@@ -1,0 +1,21 @@
+# Syntax Coloring Map For LTC2500
+
+# Datatypes (KEYWORD1)
+
+# Methods and Functions (KEYWORD2)
+LTC2500initialize	KEYWORD2	Foo
+LTC2500checkUpdate	KEYWORD2	Foo
+LTC2500update	KEYWORD2	Foo
+LTC2500updateSamplerate	KEYWORD2	Foo
+LTC2500updateOversamples	KEYWORD2	Foo
+LTC2500updateTimer	KEYWORD2	Foo
+LTC2500updateOutputMode	KEYWORD2	Foo
+LTC2500readValue	KEYWORD2	Foo
+LTC2500sendDataToPC	KEYWORD2	Foo
+
+# Instances (KEYWORD2)
+
+# CONSTANTS (LITERAL1)
+noLatencyOutput	LITERAL1	Foo
+filteredOutput	LITERAL1	Foo
+silent	LITERAL1	Foo
