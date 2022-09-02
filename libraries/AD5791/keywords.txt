@@ -1,0 +1,17 @@
+# Syntax Coloring Map For AD5791
+
+# Datatypes (KEYWORD1)
+
+# Methods and Functions (KEYWORD2)
+AD5791initialize	KEYWORD2 Foo
+AD5791clearOutput	KEYWORD2 Foo
+AD5791setDefaultVoltage	KEYWORD2 Foo
+AD5791off	KEYWORD2 Foo
+AD5791regWrite	KEYWORD2 Foo
+AD5791setVoltage	KEYWORD2 Foo
+AD5791sendSPI	KEYWORD2 Foo
+AD5791checkUpdate	KEYWORD2 Foo
+
+# Instances (KEYWORD2)
+
+# CONSTANTS (LITERAL1)
