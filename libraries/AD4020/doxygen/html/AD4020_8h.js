@@ -1,0 +1,26 @@
+var AD4020_8h =
+[
+    [ "H2BYTE", "AD4020_8h.html#a6025f240a15bf0e7b801ab8c04d54c9b", null ],
+    [ "H3BYTE", "AD4020_8h.html#a7f7cef7057ed3739e0e23950d24cd916", null ],
+    [ "HBYTE", "AD4020_8h.html#a094aed50b2f9ba9ff8387bf91574b6c2", null ],
+    [ "LBYTE", "AD4020_8h.html#a56727f12fe08d7fe2cee077e6bc824bc", null ],
+    [ "AD4020checkUpdate", "AD4020_8h.html#ac480157ff397bfb0b5fcb3d4d76d303a", null ],
+    [ "AD4020initialize", "AD4020_8h.html#ae8fc1330e5dd90c7026d7da556263a63", null ],
+    [ "AD4020initialize", "AD4020_8h.html#a74b9f18597479449af0bb831e7415763", null ],
+    [ "AD4020initialize", "AD4020_8h.html#aef955d3721ed405070a9e081cd78923e", null ],
+    [ "AD4020initialize", "AD4020_8h.html#ae7571c094d378c32702ec614a8d51c03", null ],
+    [ "AD4020readValue", "AD4020_8h.html#a4c47e8a710e0ab582c53915b7de67877", null ],
+    [ "AD4020sendDataToPC", "AD4020_8h.html#ac41901c1f56160ed6ff07cff56d4eb32", null ],
+    [ "AD4020update", "AD4020_8h.html#adcc3eb60815f3607c391775c457e3c56", null ],
+    [ "AD4020updateNoSkip", "AD4020_8h.html#a9d5569f74ca9a9a025d81d2bb1f991b9", null ],
+    [ "AD4020updateOversamples", "AD4020_8h.html#a82eeda7481a76144aaddac6ce4b3b765", null ],
+    [ "AD4020updateSamplerate", "AD4020_8h.html#a71a80d3536108e4707c288996c5cbfb2", null ],
+    [ "AD4020updateTimer", "AD4020_8h.html#aa1c99ebeddca7814a08b7f4d0b4a5a71", null ],
+    [ "AD4020updateTiming", "AD4020_8h.html#a932b4912a21db635d6e4c482261f57c0", null ],
+    [ "CNV_AD4020", "AD4020_8h.html#ad7604a98ca7dda1b79d86a1e144a72db", null ],
+    [ "DebugPin", "AD4020_8h.html#a8c6ced77a431e6489791d0b288b65425", null ],
+    [ "MISO_AD4020", "AD4020_8h.html#af39e4f6e2606e65e7151160453ded232", null ],
+    [ "MOSI_AD4020", "AD4020_8h.html#a0b52fef70471c08cb78640c153db7487", null ],
+    [ "SCLK_AD4020", "AD4020_8h.html#a3cf8fa7a892e2adb4c3d7098d80f0207", null ],
+    [ "TimerPin", "AD4020_8h.html#aacc217a9ad6e8c9297c2fd02474d1fc0", null ]
+];
