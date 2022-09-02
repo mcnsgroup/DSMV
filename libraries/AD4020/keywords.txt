@@ -1,0 +1,14 @@
+# Syntax Coloring Map For AD4020
+
+# Datatypes (KEYWORD1)
+
+# Methods and Functions (KEYWORD2)
+AD4020initialize	KEYWORD2	Foo
+AD4020checkUpdate	KEYWORD2	Foo
+AD4020update	KEYWORD2	Foo
+AD4020readValue	KEYWORD2	Foo
+AD4020sendDataToPC	KEYWORD2	Foo
+
+# Instances (KEYWORD2)
+
+# CONSTANTS (LITERAL1)
