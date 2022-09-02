@@ -1,0 +1,11 @@
+/*! 
+@mainpage AD5791
+Library for using an <b>AD5791</b> with a <b>Teensy</b> 4.0 via SPI. Used in the course "digital signal- and measurement data processing".
+
+@section AD5791 AD5791.
+
+All definitions are in AD5791.h
+
+@see AD5791.h 
+
+*/
