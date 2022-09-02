@@ -6,10 +6,11 @@
  *  
  *  @author Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
  *  @author Philipp Rahe (prahe@uos.de)
- *  @date 04.07.2021
- *  @version 1.4
+ *  @date 02.09.2022
+ *  @version 1.5
  *  
  *  @par Changelog
+ *  - 02.09.2022: Added differentiation between output reference and computational reference signal
  *  - 04.07.2022: Fixed a bug that caused the IIR filter to shift history values before calculating,
  *                fixed a bug that caused the reference output signal to break at longer time values due to float inaccuracy
  *  - 29.06.2022: Moved filters to individual files and made them configurable via USB-protocol,
@@ -196,17 +197,15 @@ void updateFilter() {
 /** @brief Interrupt routine for the Lock-In amplifier
  */
 void inputFilterOutput() {
-  // Start ISR timing
-  T4dw(LED_3, HIGH); 
   // Read most recent value
   int32_t value1 = LTC2500readValue();
   // Offset/gain correction
   float value = value1 * gainLTC2500 + offsetLTC2500;
   // Calculate the current values of the reference and shifted reference signal
   double t = fmod(T4getTime(), (double) 1.0/reffreq);
-  
-  float refSig = sin(2*PI*reffreq*t+phaseoffset/360.0*2*PI);
+
   float refSigOut = sin(2*PI*reffreq*t);
+  float refSig = sin(2*PI*reffreq*t+phaseoffset/360.0*2*PI);
   float refSigShift = sin(2*PI*reffreq*t+(phaseoffset-90.0)/360.0*2*PI);
   // Output the current value of the reference signal times 5 (why do we do this again?)
   AD5791setVoltage(5.0*refSigOut);
@@ -216,7 +215,7 @@ void inputFilterOutput() {
   // Array for filtered values
   float* filtered;
   // Apply low pass filter
-  T4dw(LED_2, HIGH);  
+  T4dw(LED_2, HIGH);  // Start filter timing
   switch(filter) {
     case IIRlow:  filtered = proc_iir(values, filterProperties[filter]);
                   break;
@@ -225,11 +224,10 @@ void inputFilterOutput() {
     case INVALID: filtered = values;
                   break;
   }
+  T4dw(LED_2, LOW);   // Stop filter timing
   // Convert values into voltages and divide values by half factor of the filter
   voltage1 = filtered[0] * RES_LTC2500 * 2;
   voltage2 = filtered[1] * RES_LTC2500 * 2;
-  // Stop ISR timing
-  T4dw(LED_3, LOW); 
 }
 
 /** @brief Sends buffers to PC once they are full
