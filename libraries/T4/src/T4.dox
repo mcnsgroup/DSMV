@@ -1,0 +1,11 @@
+/*! 
+@mainpage T4
+This library contains a lot of functions to simplify programming the <b>Teensy 4.0</b> including serial interfacing with peripherals and a PC, timing based interrupts and a function generator. It is used in the course "digital signal- and measurement data processing".
+
+@section T4 T4.
+
+All definitions are in T4.h
+
+@see T4.h 
+
+*/
