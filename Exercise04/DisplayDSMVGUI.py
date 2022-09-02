@@ -4,9 +4,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 21.06.2022, ver1.11
+# 02.09.2022, ver1.12
 # 
 # Changelog
+#   - 02.09.2022: Fixed a bug that caused the trigger threshold slider to not be disabled for Schmitt trigger
 #   - 21.06.2022: Update to maintain compatibility with newer version of DSMVLib module
 #   - 23.05.2022: Update to maintain compatibility with newer version of Arduino program,
 #                 fixed a bug that caused the serial connection to not be monitored at the beginning,
@@ -104,7 +105,7 @@ class DisplayDSMVGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 04\nv1.11")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 04\nv1.12")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -738,7 +739,7 @@ class DisplayDSMVGUI:
             self.thresholdScale["state"] = DISABLED
             self.fallingButton["state"] = DISABLED
             self.risingButton["state"] = DISABLED
-        elif self.tSelect.get() == "Schmitt Trigger":
+        elif self.tSelect.get() == "Schmitt trigger":
             self.thresholdScale["state"] = DISABLED
         else:
             self.thresholdScale["state"] = NORMAL
