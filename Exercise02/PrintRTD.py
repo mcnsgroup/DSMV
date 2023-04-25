@@ -59,8 +59,8 @@ print('-------------------------------------------')
 
 print('Received data: ')
 # Read N lines and print to shell
-Nlines = 100
-for i in range(1,Nlines):
+Nlines = 10
+for i in range(0,Nlines):
     line = ser.readline()
     print(line)
 print('-------------------------------------------')
