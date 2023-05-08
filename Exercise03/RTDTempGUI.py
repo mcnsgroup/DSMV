@@ -4,9 +4,11 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 21.06.2022, ver1.8
+# 08.05.2023, ver1.9
 # 
 # Changelog
+#   - 08.05.2023: Enable direct execution; N=5000 as max value; save as csv; file rename; 
+#                 corrected bug with legends
 #   - 21.06.2022: Update to maintain compatibility with newer version of DSMVLib module
 #   - 10.05.2022: Added functionality to display the values of a point clicked on the plots
 #   - 03.05.2022: Moved entry box processing to DSMVLib module,
@@ -122,7 +124,7 @@ class RTDTempGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 03\nv1.8")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 03\nv1.9")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -197,7 +199,7 @@ class RTDTempGUI:
         self.uiElements.append(self.sizeLabel)
         self.uiGridParams.append([2, 0, 1, 1, ""])
         # Create array size scale
-        self.sizeScale = Scale(master=self.displaySFrame, from_=1, to=1000, orient=HORIZONTAL)
+        self.sizeScale = Scale(master=self.displaySFrame, from_=1, to=5000, orient=HORIZONTAL)
         self.uiElements.append(self.sizeScale)
         self.uiGridParams.append([2, 1, 1, 4, "WE"])
         self.sizeScale.set(self.dataSize)
@@ -381,7 +383,7 @@ class RTDTempGUI:
         self.ax1.set_ylabel("Raw value AD7819")
         self.line1, = self.ax1.plot(self.x, self.data[0], 'r.-', linewidth=0.5)
         # Legend for AD7819
-        self.legend1 = self.ax1.legend(loc="upper left", title="Last value: 0")
+        self.legend1 = self.ax1.legend([], loc="upper left", title="Last value: 0")
         canvas1 = FigureCanvasTkAgg(self.fig1)
         canvas1.draw()
         self.uiElements.append(canvas1.get_tk_widget())
@@ -401,17 +403,20 @@ class RTDTempGUI:
         self.uiElements.append(self.saveLabel1)
         self.uiGridParams.append([1, 0, 1, 1, ""])
         def updateSaveLabel1(event):
-            path = L.savePath("AD7819", self.dir)
-            # save the image
-            self.fig1.savefig(path + ".svg")
-            # save the data as text
-            f = open(path + ".txt", mode = "w")
-            f.write(str(self.data[0]))
-            f.close
+            path = L.savePath("RTD_data", self.dir)
+            # save the images
+            self.fig1.savefig(path + " AD7819.svg")
+            self.fig1.savefig(path + " AD7819.png")
+            self.fig2.savefig(path + " MAX31865.svg")
+            self.fig2.savefig(path + " MAX31865.png")
+            # save the data as csv file
+            outarr = np.asarray([self.x, self.data[0], self.data[1]])
+            outarr = outarr.transpose()
+            np.savetxt(path + ".csv", outarr, delimiter=",")
             # display the saved message
-            self.saveLabel1.configure(text="Saved as " + path + "!")
+            self.saveLabel1.configure(text="Last file:\n " + path)
             # schedule message removal
-            self.window.after(2000, lambda: self.saveLabel1.configure(text=""))
+            #self.window.after(2000, lambda: self.saveLabel1.configure(text=""))
         self.saveButton1.bind("<Button-1>", updateSaveLabel1)
         toolbar1 = L.VerticalPlotToolbar(canvas1, self.saveFrame1)
         toolbar1.update()
@@ -427,7 +432,7 @@ class RTDTempGUI:
         self.ax2.set_ylabel("Raw value MAX31865")
         self.line2, = self.ax2.plot(self.x, self.data[1], 'r.-', linewidth=0.5)
         # Legend for MAX31865
-        self.legend2 = self.ax2.legend(loc="upper left", title="Last value: 0")
+        self.legend2 = self.ax2.legend([], loc="upper left", title="Last value: 0")
         canvas2 = FigureCanvasTkAgg(self.fig2)
         canvas2.draw()
         self.uiElements.append(canvas2.get_tk_widget())
@@ -437,28 +442,28 @@ class RTDTempGUI:
         # Create frame for saving the plot
         self.saveFrame2 = Frame()
         self.uiElements.append(self.saveFrame2)
-        self.uiGridParams.append([2, 2, 1, 1, "NS"])
+        self.uiGridParams.append([2, 2, 1, 1, "NW"])
         # Create save button
-        self.saveButton2 = Button(master=self.saveFrame2, text=u"\U0001f4be", font=("TkDefaultFont", 60))
-        self.uiElements.append(self.saveButton2)
-        self.uiGridParams.append([0, 0, 1, 1, ""])
+        #self.saveButton2 = Button(master=self.saveFrame2, text=u"\U0001f4be", font=("TkDefaultFont", 60))
+        #self.uiElements.append(self.saveButton2)
+        #self.uiGridParams.append([0, 0, 1, 1, ""])
         # Create label to display saved message
-        self.saveLabel2 = Label(master=self.saveFrame2)
-        self.uiElements.append(self.saveLabel2)
-        self.uiGridParams.append([1, 0, 1, 1, ""])
-        def updateSaveLabel2(event):
-            path = L.savePath("MAX31865", self.dir)
-            # save the image
-            self.fig2.savefig(path + ".svg")
-            # save the data as text
-            f = open(path + ".txt", mode = "w")
-            f.write(str(self.data[1]))
-            f.close
-            # display the saved message
-            self.saveLabel2.configure(text="Saved as " + path + "!")
-            # schedule message removal
-            self.window.after(2000, lambda: self.saveLabel2.configure(text=""))
-        self.saveButton2.bind("<Button-1>", updateSaveLabel2)
+        #self.saveLabel2 = Label(master=self.saveFrame2)
+        #self.uiElements.append(self.saveLabel2)
+        #self.uiGridParams.append([1, 0, 1, 1, ""])
+        #def updateSaveLabel2(event):
+        #    path = L.savePath("MAX31865", self.dir)
+        #    # save the image
+        #    self.fig2.savefig(path + ".svg")
+        #    # save the data as text
+        #    f = open(path + ".txt", mode = "w")
+        #    f.write(str(self.data[1]))
+        #    f.close
+        #    # display the saved message
+        #    self.saveLabel2.configure(text="Saved as " + path + "!")
+        #    # schedule message removal
+        #    self.window.after(2000, lambda: self.saveLabel2.configure(text=""))
+        #self.saveButton2.bind("<Button-1>", updateSaveLabel2)
         toolbar2 = L.VerticalPlotToolbar(canvas2, self.saveFrame2)
         toolbar2.update()
         toolbar2.pack_forget()
@@ -779,7 +784,7 @@ class RTDTempGUI:
                 self.ax1.cla()
                 self.line1 = self.ax1.hist(self.data[0], bins=np.arange(min(self.data[0]), max(self.data[0]) + 2, 1), histtype='step')
             # Update plot legend
-            self.legend1 = self.ax1.legend(loc="upper left", title="Last value: %.2f" %self.data[0][len(self.data[0])-1])
+            self.legend1 = self.ax1.legend([], loc="upper left", title="Last value: %.2f" %self.data[0][len(self.data[0])-1])
             # Label axes correctly
             self.labelAxes()
             L.updateCanvas(self.fig1.canvas, self.ax1)
@@ -794,7 +799,7 @@ class RTDTempGUI:
                     self.ax2.cla()
                     self.line2 = self.ax2.hist(self.data[1], bins=np.arange(min(self.data[1]), max(self.data[1]) + 2, 1), histtype='step')
                 # Update plot legend
-                self.legend2 = self.ax2.legend(loc="upper left", title="Last value: %.2f" %self.data[1][len(self.data[1])-1])
+                self.legend2 = self.ax2.legend([], loc="upper left", title="Last value: %.2f" %self.data[1][len(self.data[1])-1])
                 # Label axes correctly
                 self.labelAxes()
                 L.updateCanvas(self.fig2.canvas, self.ax2)
@@ -818,4 +823,12 @@ class RTDTempGUI:
     
     # Callback for the stop button
     def stop(self, event):
+        self.reading = False
+        self.window.update_idletasks()
+        self.window.withdraw()
         self.window.destroy()
+
+
+# start the GUI when the file is directly run by the python interpreter
+if __name__ == '__main__':
+    gui = RTDTempGUI()
