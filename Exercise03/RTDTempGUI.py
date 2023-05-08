@@ -443,27 +443,6 @@ class RTDTempGUI:
         self.saveFrame2 = Frame()
         self.uiElements.append(self.saveFrame2)
         self.uiGridParams.append([2, 2, 1, 1, "NW"])
-        # Create save button
-        #self.saveButton2 = Button(master=self.saveFrame2, text=u"\U0001f4be", font=("TkDefaultFont", 60))
-        #self.uiElements.append(self.saveButton2)
-        #self.uiGridParams.append([0, 0, 1, 1, ""])
-        # Create label to display saved message
-        #self.saveLabel2 = Label(master=self.saveFrame2)
-        #self.uiElements.append(self.saveLabel2)
-        #self.uiGridParams.append([1, 0, 1, 1, ""])
-        #def updateSaveLabel2(event):
-        #    path = L.savePath("MAX31865", self.dir)
-        #    # save the image
-        #    self.fig2.savefig(path + ".svg")
-        #    # save the data as text
-        #    f = open(path + ".txt", mode = "w")
-        #    f.write(str(self.data[1]))
-        #    f.close
-        #    # display the saved message
-        #    self.saveLabel2.configure(text="Saved as " + path + "!")
-        #    # schedule message removal
-        #    self.window.after(2000, lambda: self.saveLabel2.configure(text=""))
-        #self.saveButton2.bind("<Button-1>", updateSaveLabel2)
         toolbar2 = L.VerticalPlotToolbar(canvas2, self.saveFrame2)
         toolbar2.update()
         toolbar2.pack_forget()
