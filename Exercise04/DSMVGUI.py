@@ -8,7 +8,7 @@
 # 
 # Changelog
 #   - 12.05.2023: Renamed to DSMVGUI; added direct calling option; optimise label formatting
-#                 reduced to one save button; csv export optimised
+#                 reduced to one save button; csv export optimised; cleaned version
 #   - 02.09.2022: Fixed a bug that caused the trigger threshold slider to not be disabled for Schmitt trigger
 #   - 21.06.2022: Update to maintain compatibility with newer version of DSMVLib module
 #   - 23.05.2022: Update to maintain compatibility with newer version of Arduino program,
@@ -376,14 +376,6 @@ class DSMVGUI:
             np.savetxt(path + ".csv", outarr, delimiter=",")
             # display the saved message
             self.saveLabel1.configure(text="Last file:\n " + path)
-            # OLD: save the data as text
-            #f = open(path + ".txt", mode = "w")
-            #f.write(str(self.data[0]))
-            #f.close
-            # display the saved message
-            #self.saveLabel1.configure(text="Saved as " + path + "!")
-            # schedule message removal
-            #self.window.after(2000, lambda: self.saveLabel1.configure(text=""))
         self.saveButton1.bind("<Button-1>", updateSaveLabel1)
         toolbar1 = L.VerticalPlotToolbar(canvas1, self.saveFrame1)
         toolbar1.update()
@@ -410,27 +402,6 @@ class DSMVGUI:
         self.saveFrame2 = Frame()
         self.uiElements.append(self.saveFrame2)
         self.uiGridParams.append([2, 2, 1, 1, "NW"])
-        # Create save button
-        #self.saveButton2 = Button(master=self.saveFrame2, text=u"\U0001F4BE", font=("TkDefaultFont", 60))
-        #self.uiElements.append(self.saveButton2)
-        #self.uiGridParams.append([0, 0, 1, 1, ""])
-        ## Create label to display saved message
-        #self.saveLabel2 = Label(master=self.saveFrame2)
-        #self.uiElements.append(self.saveLabel2)
-        #self.uiGridParams.append([1, 0, 1, 1, ""])
-        #def updateSaveLabel2(event):
-        #    path = L.savePath("Time Series LTC2500", self.dir)
-        #    # save the image
-        #    self.fig2.savefig(path + ".svg")
-        #    # save the data as text
-        #    f = open(path + ".txt", mode = "w")
-        #    f.write(str(self.data[1]))
-        #    f.close
-        #    # display the saved message
-        #    self.saveLabel2.configure(text="Saved as " + path + "!")
-        #    # schedule message removal
-        #    self.window.after(2000, lambda: self.saveLabel2.configure(text=""))
-        #self.saveButton2.bind("<Button-1>", updateSaveLabel2)
         toolbar2 = L.VerticalPlotToolbar(canvas2, self.saveFrame2)
         toolbar2.update()
         toolbar2.pack_forget()
@@ -456,27 +427,6 @@ class DSMVGUI:
         self.saveFrame3 = Frame()
         self.uiElements.append(self.saveFrame3)
         self.uiGridParams.append([3, 2, 1, 1, "NW"])
-        # Create save button
-        #self.saveButton3 = Button(master=self.saveFrame3, text=u"\U0001F4BE", font=("TkDefaultFont", 60))
-        #self.uiElements.append(self.saveButton3)
-        #self.uiGridParams.append([0, 0, 1, 1, ""])
-        ## Create label to display saved message
-        #self.saveLabel3 = Label(master=self.saveFrame3)
-        #self.uiElements.append(self.saveLabel3)
-        #self.uiGridParams.append([1, 0, 1, 1, ""])
-        #def updateSaveLabel3(event):
-        #    path = L.savePath("Time Series Internal ADC", self.dir)
-        #    # save the image
-        #    self.fig1.savefig(path + ".svg")
-        #    # save the data as text
-        #    f = open(path + ".txt", mode = "w")
-        #    f.write(str(self.data[2]))
-        #    f.close
-        #    # display the saved message
-        #    self.saveLabel3.configure(text="Saved as " + path + "!")
-        #    # schedule message removal
-        #    self.window.after(2000, lambda: self.saveLabel3.configure(text=""))
-        #self.saveButton3.bind("<Button-1>", updateSaveLabel3)
         toolbar3 = L.VerticalPlotToolbar(canvas3, self.saveFrame3)
         toolbar3.update()
         toolbar3.pack_forget()
