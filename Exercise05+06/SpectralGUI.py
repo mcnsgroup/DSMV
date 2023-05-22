@@ -17,9 +17,12 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 31.05.2022, ver1.13
+# 21.05.2023, ver1.14
 # 
 # Changelog
+#   - 21.05.2023: Corrected tooltips; modified axes limits so that zoom is maintained; 
+#                 added direct calling option; 
+#                 reduced to one save button; csv export optimised;
 #   - 31.05.2022: Fixed a bug that caused the spectral data to not be saved properly as text file
 #   - 30.05.2022: Compatibility update for new USB protocol,
 #                 changed value displays to DSMVLib version
@@ -149,7 +152,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-07\nv1.12")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-07\nv1.14")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -449,6 +452,7 @@ class SpectralGUI:
         self.uiElements.append(self.stopButton)
         self.uiGridParams.append([1, 0, 1, 2, "NESW"])
         self.stopButton.bind("<Button-1>", self.stop)
+        #### data plots
         # Create canvas for the time series
         self.fig1 = Figure(figsize=(5, 2), layout='constrained')
         # Maximum time value
@@ -466,7 +470,7 @@ class SpectralGUI:
         self.uiElements.append(canvas1.get_tk_widget())
         self.uiGridParams.append([1, 0, 1, 2, "NESW"])
         # Create data tip for the voltage
-        self.dataTipVoltage = L.dataTip(canvas1, self.ax1, self.voltage, 0.01, "b")
+        self.dataTipVoltage = L.dataTip(canvas1, self.ax1, 0.01, line=self.voltage, faceColor="b")
         # Create frame for saving the plot
         self.saveFrame1 = Frame()
         self.uiElements.append(self.saveFrame1)
@@ -480,23 +484,46 @@ class SpectralGUI:
         self.uiElements.append(self.saveLabel1)
         self.uiGridParams.append([1, 0, 1, 1, ""])
         def updateSaveLabel1(event):
-            path = L.savePath("Time Series", self.dir)
+            path = L.savePath("DSMV_data", self.dir)
             # save the image
             self.fig1.savefig(path + ".svg")
-            # save the data as text
-            f = open(path + ".txt", mode = "w")
-            f.write(str(self.data))
-            f.close
-            # display the saved message
-            self.saveLabel1.configure(text="Saved as " + path + "!")
-            # schedule message removal
-            self.window.after(2000, lambda: self.saveLabel1.configure(text=""))
+            self.fig1.savefig(path + ".png")
+            self.fig2.savefig(path + "spectrum.svg")
+            self.fig2.savefig(path + "spectrum.png")
+            # save the time trace data as text
+            outarr = None
+            outarr = np.asarray([self.x, self.data])
+            outarr = outarr.transpose()
+            np.savetxt(path + ".csv", outarr, delimiter=",")
+            # save the spectrum data as text
+            outarr = None
+            if self.window1.get() != "Disabled":
+                if self.window2.get() != "Disabled":
+                    outarr = np.asarray([self.f1, self.spectrum1.get_ydata(), self.f2, self.spectrum2.get_ydata()])
+                else:
+                    outarr = np.asarray([self.f1, self.spectrum1.get_ydata()])
+            else:
+                if self.window2.get() != "Disabled":
+                    outarr = np.asarray([self.f2, self.spectrum2.get_ydata()])
+                else:
+                    outarr = np.asarray([])
+            outarr = outarr.transpose()
+            np.savetxt(path + "spectrum.csv", outarr, delimiter=",")
+            self.saveLabel1.configure(text="Last file:\n " + path)
+            #f = open(path + ".txt", mode = "w")
+            #f.write(str(self.data))
+            #f.close
+            ## display the saved message
+            #self.saveLabel1.configure(text="Saved as " + path + "!")
+            ## schedule message removal
+            #self.window.after(2000, lambda: self.saveLabel1.configure(text=""))
         self.saveButton1.bind("<Button-1>", updateSaveLabel1)
         toolbar1 = L.VerticalPlotToolbar(canvas1, self.saveFrame1)
         toolbar1.update()
         toolbar1.pack_forget()
         self.uiElements.append(toolbar1)
         self.uiGridParams.append([2, 0, 1, 1, "NW"])
+        ##### data spectrum
         # Create canvas for the spectra
         self.fig2 = Figure(figsize=(5, 2), layout='constrained')
         # Maximum frequency value
@@ -512,6 +539,7 @@ class SpectralGUI:
         self.ax2.set_ylabel(self.psdLabel)
         # Set frequency axis limits to match data
         self.ax2.set_xlim([0, fMax])
+        self.ax2lastxlim =[0, fMax]
         # Create arrays to hold current spectra (pre scaling and averaging)
         self.S1Pre = [0] * self.freqs1
         self.S2Pre = [0] * self.freqs2
@@ -585,34 +613,34 @@ class SpectralGUI:
         self.uiElements.append(canvas2.get_tk_widget())
         self.uiGridParams.append([2, 0, 1, 2, "NESW"])
         # Create data tip for spectrum 1
-        self.dataTipSpectrum1 = L.dataTip(canvas2, self.ax2, self.spectrum1, 0.01, "b")
+        self.dataTipSpectrum1 = L.dataTip(canvas2, self.ax2, 0.01, line=self.spectrum1, faceColor="b")
         # Create data tip for spectrum 2
-        self.dataTipSpectrum2 = L.dataTip(canvas2, self.ax2, self.spectrum2, 0.01, "r")
+        self.dataTipSpectrum2 = L.dataTip(canvas2, self.ax2, 0.01, line=self.spectrum2, faceColor="r")
         # Create frame for saving the plot
         self.saveFrame2 = Frame()
         self.uiElements.append(self.saveFrame2)
-        self.uiGridParams.append([2, 2, 1, 1, "NS"])
-        # Create save button
-        self.saveButton2 = Button(master=self.saveFrame2, text=u"\U0001F4BE", font=("TkDefaultFont", 60))
-        self.uiElements.append(self.saveButton2)
-        self.uiGridParams.append([0, 0, 1, 1, ""])
-        # Create label to display saved message
-        self.saveLabel2 = Label(master=self.saveFrame2)
-        self.uiElements.append(self.saveLabel2)
-        self.uiGridParams.append([1, 0, 1, 1, ""])
-        def updateSaveLabel2(event):
-            path = L.savePath("Spectrum", self.dir)
-            # save the image
-            self.fig2.savefig(path + ".svg")
-            # save the data as text
-            f = open(path + ".txt", mode = "w")
-            f.write(str(self.data))
-            f.close
-            # display the saved message
-            self.saveLabel2.configure(text="Saved as " + path + "!")
-            # schedule message removal
-            self.window.after(2000, lambda: self.saveLabel2.configure(text=""))
-        self.saveButton2.bind("<Button-1>", updateSaveLabel2)
+        self.uiGridParams.append([2, 2, 1, 1, "NW"])
+        ## Create save button
+        #self.saveButton2 = Button(master=self.saveFrame2, text=u"\U0001F4BE", font=("TkDefaultFont", 60))
+        #self.uiElements.append(self.saveButton2)
+        #self.uiGridParams.append([0, 0, 1, 1, ""])
+        ## Create label to display saved message
+        #self.saveLabel2 = Label(master=self.saveFrame2)
+        #self.uiElements.append(self.saveLabel2)
+        #self.uiGridParams.append([1, 0, 1, 1, ""])
+        #def updateSaveLabel2(event):
+        #    path = L.savePath("Spectrum", self.dir)
+        #    # save the image
+        #    self.fig2.savefig(path + ".svg")
+        #    # save the data as text
+        #    f = open(path + ".txt", mode = "w")
+        #    f.write(str(self.data))
+        #    f.close
+        #    # display the saved message
+        #    self.saveLabel2.configure(text="Saved as " + path + "!")
+        #    # schedule message removal
+        #    self.window.after(2000, lambda: self.saveLabel2.configure(text=""))
+        #self.saveButton2.bind("<Button-1>", updateSaveLabel2)
         toolbar2 = L.VerticalPlotToolbar(canvas2, self.saveFrame2)
         toolbar2.update()
         toolbar2.pack_forget()
@@ -866,6 +894,11 @@ class SpectralGUI:
     def updateAxes(self):
         # Maximum time value
         tMax = (self.dataSize-1)*self.oversamples/self.samplerate
+        # get current axes limits for spectrum
+        xlim2 = self.ax2.get_xlim()
+        setxlim=False
+        if self.ax2lastxlim[0] == xlim2[0] and self.ax2lastxlim[1] == xlim2[1]:
+            setxlim=True
         # Update values for time axis
         self.x = np.linspace(0, tMax, self.dataSize)
         # Maximum frequency value
@@ -892,9 +925,11 @@ class SpectralGUI:
         # Set time axes scale
         self.ax1.set_xlim([0, tMax])
         # Set frequency axis limits to match data
-        self.ax2.set_xlim([0, fMax])
-        if self.drawPhase:
-            self.ax3.set_xlim([0, fMax])
+        if(setxlim):
+            self.ax2.set_xlim([0, fMax])
+            self.ax2lastxlim = [0, fMax]
+            if self.drawPhase:
+                self.ax3.set_xlim([0, fMax])
         # Update the canvases
         L.updateCanvas(self.fig1.canvas, self.ax1, False, True)
         L.updateCanvas(self.fig2.canvas, self.ax2, False, True)
@@ -1095,10 +1130,13 @@ class SpectralGUI:
         # Read raw values
         rawValues = self.port.readB(self.dataSize*4)
         # Only process data, if there was any read
-        if rawValues != None and rawValues != "not enough data":
+        #if isinstance(rawValues, bytes):
+        #    print("{}".format(type(rawValues)))
+        #    print("{}".format(len(rawValues)))
+        if rawValues != None and rawValues != "not enough data": 
             #lastTime = time.time()
             # Discard any extra data on the port
-            self.port.clearBuffer()
+            #self.port.clearBuffer()
             # Prepare for next read
             self.readNext = True
             values = list(struct.unpack("%df" %self.dataSize, rawValues))
@@ -1287,3 +1325,6 @@ class SpectralGUI:
         self.endFindex = int(self.endF * (self.freqs1 - 1) / self.f1[-1])
         # Update values in the plot
         self.dots.set_xdata([self.startF, self.endF])
+
+if __name__ == '__main__':
+    gui = SpectralGUI()
