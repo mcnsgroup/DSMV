@@ -1,4 +1,4 @@
-# WindowHanning computes the Hanning window and ENBW for a given number of data points.
+# WindowHann computes the Hann window and ENBW for a given number of data points.
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
@@ -30,14 +30,14 @@
 
 import numpy as np
 
-# Returns the Hanning window and its ENBW
+# Returns the Hann window and its ENBW
 # for a given number of data points.
 # inputs:
 #   N: Number of data points.
 # outputs:
 #   window: Window function
 #   M_2overM_1square: effective noise bandwidth / sampling frequency
-def WindowHanning(N):
+def WindowHann(N):
     # Window function
     window = [0] * N
     for k in range(N):
