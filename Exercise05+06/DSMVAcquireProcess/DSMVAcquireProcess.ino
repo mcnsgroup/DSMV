@@ -68,7 +68,7 @@ float offsetInternal = 0;       /**< Offset voltage for the internal ADC (this i
 float gainInternal = 1.0;       /**< Gain factor Gain factor for the internal ADC (this is your task). */
 
 bool blinker = false;            /**< Specifies usage of LED_1. true: 1s interval (Note: This deactivates the analog output!). false: loop duration. */
-bool SignalPassthrough = true;
+bool SignalPassthrough = false;
 
 bool AD4020active = true;       /**< Specifies whether the AD4020 is being read. */
 bool LTC2500active = true;      /**< Specifies whether the AD4020 is being read. */
