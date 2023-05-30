@@ -17,9 +17,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 21.05.2023, ver1.14
+# 21.05.2023, ver1.15
 # 
 # Changelog
+#   - 30.05.2023: N->N_s; power calculation corrected; 
 #   - 21.05.2023: Corrected tooltips; modified axes limits so that zoom is maintained; 
 #                 added direct calling option; 
 #                 reduced to one save button; csv export optimised;
@@ -152,7 +153,7 @@ class SpectralGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-07\nv1.14")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-07\nv1.15")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -208,7 +209,7 @@ class SpectralGUI:
         # Maximum samplerate
         self.samplerateMax = 80000
         # Create label for the data size entry box
-        self.sizeLabel = Label(master=self.boardSFrame, text="N")
+        self.sizeLabel = Label(master=self.boardSFrame, text="N_s")
         self.uiElements.append(self.sizeLabel)
         self.uiGridParams.append([2, 0, 1, 1, "E"])
         # Variable to control content of the data size entry box
@@ -386,7 +387,7 @@ class SpectralGUI:
         self.transformSizeStatus = StringVar()
         self.transformSizeStatus.set("N_FT-1=N/2")
         # Create transform size status selector buttons
-        self.NButton = Radiobutton(self.displaySFrame, text="N_FT-1=N/2", variable = self.transformSizeStatus, value = "N_FT-1=N/2")
+        self.NButton = Radiobutton(self.displaySFrame, text="N_FT-1=N_s/2", variable = self.transformSizeStatus, value = "N_FT-1=N/2")
         self.uiElements.append(self.NButton)
         self.uiGridParams.append([4, 0, 1, 1, "W"])
         self.NButton.bind("<Button-1>", self.handle_lockedTransform)
@@ -896,6 +897,8 @@ class SpectralGUI:
         tMax = (self.dataSize-1)*self.oversamples/self.samplerate
         # get current axes limits for spectrum
         xlim2 = self.ax2.get_xlim()
+        #print(self.ax2.margins())
+        #print(xlim2)
         setxlim=False
         if self.ax2lastxlim[0] == xlim2[0] and self.ax2lastxlim[1] == xlim2[1]:
             setxlim=True
@@ -1193,7 +1196,7 @@ class SpectralGUI:
             # Update the legends
             # extract range to integrate over and average
             powSpec = np.divide(self.S1Pre[self.startFindex:self.endFindex+1], self.averaged)
-            power = sum(np.multiply(np.power(powSpec, 2), self.samplerate/(self.enbw1 * self.dataSize)))
+            power = sum(np.multiply(np.power(powSpec, 2), self.samplerate/(2 * self.enbw1 * (self.transformSize1 - 1) * 2)))
             # List of all plots for the legend
             self.plots = []
             # List of all plot titles
