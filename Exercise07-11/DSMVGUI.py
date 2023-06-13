@@ -1,6 +1,6 @@
-# SpectralGUI includes a GUI for the spectral analysis of the oscilloscope functionality of the DSMV board
+# DSMVGUI includes a GUI for the spectral analysis of the oscilloscope functionality of the DSMV board
 #
-# Requires the Arduino sketch DisplayDSMVGenerate.ino loaded on the Teensy 4.0.
+# Requires the Arduino sketch SpectralProcessingDSMV.ino loaded on the Teensy 4.0.
 # 
 # There are two spectra being displayed,
 # one for each of the selectable filter windows.
@@ -17,9 +17,10 @@
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # Philipp Rahe (prahe@uni-osnabrueck.de)
-# 29.06.2022, ver1.25.1
+# 13.06.2023, ver1.26
 # 
 # Changelog
+#   - 13.06.2023: Renamed to DSMVGUI
 #   - 29.06.2022: Fixed a bug that caused a command to not be read by the board sometimes,
 #                 fixed a bug that caused the arithmetic to not be set correctly
 #   - 28.06.2022: Fixed a bug that caused a filter property entry box to be displayed for the IIR filter,
@@ -149,9 +150,9 @@ import math
 # Import custom modules
 from DSMVLib import DSMVLib as L
 
-class SpectralGUI:
+class DSMVGUI:
     # Constructor method
-    def __init__(self, mode="Spectral GUI"):
+    def __init__(self, mode="DSMV GUI"):
         # Initialize variables defining which version of the GUI is being shown
         # Initialize all components
         # Create control window
@@ -2403,3 +2404,6 @@ class SpectralGUI:
             self.endFindex -= 1
         # Update values in the plot
         self.dots.set_xdata([self.startF, self.endF])
+
+if __name__ == "__main__":
+   gui = DSMVGUI()
