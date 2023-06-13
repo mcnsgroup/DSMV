@@ -20,7 +20,7 @@
 # 13.06.2023, ver1.26
 # 
 # Changelog
-#   - 13.06.2023: Renamed to DSMVGUI
+#   - 13.06.2023: Renamed to DSMVGUI; adapted storing as in previous GUIs
 #   - 29.06.2022: Fixed a bug that caused a command to not be read by the board sometimes,
 #                 fixed a bug that caused the arithmetic to not be set correctly
 #   - 28.06.2022: Fixed a bug that caused a filter property entry box to be displayed for the IIR filter,
@@ -163,7 +163,7 @@ class DSMVGUI:
         self.window.rowconfigure((1, 2), weight=1)
         # Get file path
         self.dir = os.path.relpath(__file__)
-        self.dir = self.dir[0:len(self.dir)-14]
+        self.dir = self.dir[0:len(self.dir)-10]
         # Initialize the port for the Board
         self.port = 0
         try:
@@ -191,7 +191,7 @@ class DSMVGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 05-11\nv1.25.1")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 07-11\nv1.26")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -734,15 +734,41 @@ class DSMVGUI:
         self.uiElements.append(self.saveLabel1)
         self.uiGridParams.append([1, 0, 1, 1, ""])
         def updateSaveLabel1(event):
-            path = L.savePath("Time Series", self.dir)
+            path = L.savePath("DSMV_data", self.dir)
             # save the image
             self.fig1.savefig(path + ".svg")
-            # save the data as csv file
-            L.saveFigCSV(self.fig1, path)
-            # display the saved message
-            self.saveLabel1.configure(text="Saved as " + path + "!")
-            # schedule message removal
-            self.window.after(2000, lambda: self.saveLabel1.configure(text=""))
+            self.fig1.savefig(path + ".png")
+            self.fig2.savefig(path + "spectrum.svg")
+            self.fig2.savefig(path + "spectrum.png")
+            # save the time trace data as text
+            outarr = None
+            outarr = np.asarray([self.x, self.data])
+            outarr = outarr.transpose()
+            np.savetxt(path + ".csv", outarr, delimiter=",")
+            # save the spectrum data as text
+            outarr = None
+            if self.window1.get() != "Disabled":
+                if self.window2.get() != "Disabled":
+                    outarr = np.asarray([self.f1, self.spectrum1.get_ydata(), self.f2, self.spectrum2.get_ydata()])
+                else:
+                    outarr = np.asarray([self.f1, self.spectrum1.get_ydata()])
+            else:
+                if self.window2.get() != "Disabled":
+                    outarr = np.asarray([self.f2, self.spectrum2.get_ydata()])
+                else:
+                    outarr = np.asarray([])
+            outarr = outarr.transpose()
+            np.savetxt(path + "spectrum.csv", outarr, delimiter=",")
+            self.saveLabel1.configure(text="Last file:\n " + path)
+            #path = L.savePath("Time Series", self.dir)
+            ## save the image
+            #self.fig1.savefig(path + ".svg")
+            ## save the data as csv file
+            #L.saveFigCSV(self.fig1, path)
+            ## display the saved message
+            #self.saveLabel1.configure(text="Saved as " + path + "!")
+            ## schedule message removal
+            #self.window.after(2000, lambda: self.saveLabel1.configure(text=""))
         self.saveButton1.bind("<Button-1>", updateSaveLabel1)
         toolbar1 = L.VerticalPlotToolbar(canvas1, self.saveFrame1)
         toolbar1.update()
@@ -849,26 +875,26 @@ class DSMVGUI:
         # Create frame for saving the plot
         self.saveFrame2 = Frame()
         self.uiElements.append(self.saveFrame2)
-        self.uiGridParams.append([2, 2, 1, 1, "NS"])
+        self.uiGridParams.append([2, 2, 1, 1, "NW"])
         # Create save button
-        self.saveButton2 = Button(master=self.saveFrame2, text=u"\U0001F4BE", font=("TkDefaultFont", 60))
-        self.uiElements.append(self.saveButton2)
-        self.uiGridParams.append([0, 0, 1, 1, ""])
+        #self.saveButton2 = Button(master=self.saveFrame2, text=u"\U0001F4BE", font=("TkDefaultFont", 60))
+        #self.uiElements.append(self.saveButton2)
+        #self.uiGridParams.append([0, 0, 1, 1, ""])
         # Create label to display saved message
-        self.saveLabel2 = Label(master=self.saveFrame2)
-        self.uiElements.append(self.saveLabel2)
-        self.uiGridParams.append([1, 0, 1, 1, ""])
-        def updateSaveLabel2(event):
-            path = L.savePath("Spectrum", self.dir)
-            # save the image
-            self.fig2.savefig(path + ".svg")
-            # save the data of spectra as csv file
-            L.saveFigCSV(self.fig2, path)
-            # display the saved message
-            self.saveLabel2.configure(text="Saved as " + path + "!")
-            # schedule message removal
-            self.window.after(2000, lambda: self.saveLabel2.configure(text=""))
-        self.saveButton2.bind("<Button-1>", updateSaveLabel2)
+        #self.saveLabel2 = Label(master=self.saveFrame2)
+        #self.uiElements.append(self.saveLabel2)
+        #self.uiGridParams.append([1, 0, 1, 1, ""])
+        #def updateSaveLabel2(event):
+        #    path = L.savePath("Spectrum", self.dir)
+        #    # save the image
+        #    self.fig2.savefig(path + ".svg")
+        #    # save the data of spectra as csv file
+        #    L.saveFigCSV(self.fig2, path)
+        #    # display the saved message
+        #    self.saveLabel2.configure(text="Saved as " + path + "!")
+        #    # schedule message removal
+        #    self.window.after(2000, lambda: self.saveLabel2.configure(text=""))
+        #self.saveButton2.bind("<Button-1>", updateSaveLabel2)
         toolbar2 = L.VerticalPlotToolbar(canvas2, self.saveFrame2)
         toolbar2.update()
         toolbar2.pack_forget()
