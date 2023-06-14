@@ -106,7 +106,7 @@ int mode = spectral;  /**< Operation mode. */
 #define defaultSamplerate 20000     /**< Default value for sampling frequency for specral analysis. */
 #define defaultProcessingRate 5000  /**< Default value for frequency for reading the LTC2500, processing the data and output at the AD5791. */
 
-const int numFilters = 11;  /**< Number of filters. */
+const int numFilters = 12;  /**< Number of filters. */
 const int numProps = 6;     /**< Number of properties per filter. */
 
 // Different filters and their default properties
@@ -132,6 +132,8 @@ const int numProps = 6;     /**< Number of properties per filter. */
 #define defaultLpf3 {0, NULL, NULL, NULL, NULL, defaultProcessingRate}
 #define progIIR 10
 #define defaultProgIIR {NULL, NULL, NULL, NULL, NULL, NULL}
+#define ownDef 11
+#define defaultOwnDef {NULL, NULL, NULL, NULL, NULL, NULL}
 
 // Include filter functions
 #include "scale.h"
@@ -142,6 +144,7 @@ const int numProps = 6;     /**< Number of properties per filter. */
 #include "lpf2.h"
 #include "lpf3.h"
 #include "iir.h"
+#include "ownDef.h"
 
 /** Array holding the properties of all filters.
  *  
@@ -158,7 +161,8 @@ float filterProperties[numFilters][numProps] = {
   defaultFIRhigh,
   defaultLpf2,
   defaultLpf3,
-  defaultProgIIR
+  defaultProgIIR,
+  defaultOwnDef
 };
 
 int filter = progIIR;   /**< Currently selected filter. */
@@ -201,6 +205,11 @@ void setup() {
   T4interSetup(GPT1, 1 / processingRate); // Set the interval for the read interrupt
   T4setInterrupt2(spectralRead);          // Set the ISR for specral reading
   T4interSetup(GPT2, 1 / samplerate);     // Set the interval for the output interrupt
+
+  /*****************************
+   * Set default filter to ownDef (Exercise 8.B)
+   */
+  filter = ownDef;
 
   /******************************
    * Finalise setup */
@@ -346,6 +355,8 @@ void readProcessOutput() {
     case lpf3:      outputValue = proc_lpf3(outputValue, filterProperties[filter]);
                     break;
     case progIIR:   outputValue = proc_iir(outputValue, filterProperties[filter]);
+                    break;
+    case ownDef:    outputValue = proc_ownDef(outputValue, filterProperties[filter]);
                     break;
   }
   //T4toggle(LED_3);
@@ -536,6 +547,10 @@ bool checkUpdateUSB(String command) {
                                                   return true;
                                                   break;
                                   case progIIR:   filter = progIIR;
+                                                  resetHistory();
+                                                  return true;
+                                                  break;
+                                  case ownDef:   filter = ownDef;
                                                   resetHistory();
                                                   return true;
                                                   break;
@@ -734,6 +749,7 @@ int checkFilter(String command) {
   if(command.startsWith("Low pass filter 2nd order")) {return lpf2;}
   if(command.startsWith("Low pass filter 3rd order")) {return lpf3;}
   if(command.startsWith("Programmable IIR filter"))   {return progIIR;}
+  if(command.startsWith("Own definition"))            {return ownDef;}
   T4pln(command);
   return INVALID;
 }

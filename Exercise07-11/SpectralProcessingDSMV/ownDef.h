@@ -1,19 +1,27 @@
-/* historic value */
+/* variables for historic values y_{n-1} and y_{n-2} */
 float yown_n1 = 0.0;
+float yown_n2 = 0.0;
 
-/** @brief Implements a low-pass filter of 1st order
+/** @brief Offers the implementation of a filter
  *  
- *  IO-equation: y_n = 1/(f_p/(2*PI*f_c)+1)*(xn + f_p/(2*PI*f_c)*y_{n-1})
- *  
- *  @param xn analog input value
+ *  @param xn analog input value (in 1V)
  *  @param props standardized properties array with the following order:		
- *		props[5] holds the processing frequency
- *  @return Resulting signal value
+ *		props[5] holds the processing frequency (in Hz)
+ *  @return Resulting signal value (in 1V)
  */
 float proc_ownDef(float xn, float props[]) {
+  // corner frequency
   float fc = 500; 
-  float fac = props[5]/(2.0*PI*fc);
-  float out = xn;  //TODO
-  yown_n1 = out;
-  return out;
+  // prefactor
+  float k = props[5]/(2.0*PI*fc);
+
+  // calculate y_n
+  float yn = xn;  //TODO
+
+  // store historic values y_{n-1} and y_{n-2}
+  yown_n2 = yown_n1;
+  yown_n1 = yn;
+
+  // return y_n
+  return yn;
 }
