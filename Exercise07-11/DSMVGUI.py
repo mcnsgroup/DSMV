@@ -490,7 +490,8 @@ class DSMVGUI:
         # List of different signal filters
         self.filters = ["Scaling", "Moving average", "Low pass filter 1st order", "High pass filter 1st order",
                         "FIR bandpass filter", "FIR bandstop filter", "FIR low pass filter", "FIR high pass filter",
-                        "Low pass filter 2nd order", "Low pass filter 3rd order", "Programmable IIR filter"]
+                        "Low pass filter 2nd order", "Low pass filter 3rd order", "Programmable IIR filter",
+                        "Own definition"]
         # Create combo box for filter selector
         self.filterSelect = ttk.Combobox(master=self.filterFrame, values = self.filters, state="readonly")
         self.uiElements.append(self.filterSelect)
@@ -502,21 +503,21 @@ class DSMVGUI:
         self.filterSelect.set(self.filters[filterDefIndex])
         # Names for the filter property 1
         self.prop1Names = ["Gain", "Number of samples", "Cutoff frequency", "Cutoff frequency", "Lower frequency",
-                           "Lower frequency", "Cutoff frequency", "Cutoff frequency", "Cutoff frequency", "Cutoff frequency", ""]
+                           "Lower frequency", "Cutoff frequency", "Cutoff frequency", "Cutoff frequency", "Cutoff frequency", "", ""]
         # Visibility of filter property 1
-        self.prop1Visible = [True, True, True, True, True, True, True, True, True, True, False]
+        self.prop1Visible = [True, True, True, True, True, True, True, True, True, True, False, False]
         # Create label for the filter property 1 entry box
         self.prop1Label = Label(master=self.filterFrame, text=self.prop1Names[filterDefIndex])
         self.uiElements.append(self.prop1Label)
         self.uiGridParams.append([1, 0, 1, 1, "E"])
         # Value type for the filter property 1
-        self.prop1Type = ["Float", "Integer", "Float", "Float", "Float", "Float", "Float", "Float", "Float", "Float", ""]
+        self.prop1Type = ["Float", "Integer", "Float", "Float", "Float", "Float", "Float", "Float", "Float", "Float", "", ""]
         # Default values for the filter property 1 (later current values)
-        self.prop1Value = [1.0, 1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, None]
+        self.prop1Value = [1.0, 1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, None, None]
         # Minimum values for the filter property 1
-        self.prop1Min = [-np.inf, 1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, None]
+        self.prop1Min = [-np.inf, 1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, None, None]
         # Maximum values for the filter property 1
-        self.prop1Max = [np.inf, 256, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, None]
+        self.prop1Max = [np.inf, 256, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, None, None]
         # Variable to control content of the filter property 1 entry box
         self.prop1V = StringVar()
         self.prop1V.set(str(self.prop1Value[filterDefIndex]))
@@ -528,21 +529,21 @@ class DSMVGUI:
         self.prop1Entry.bind("<KP_Enter>", self.handle_updateProp1)
         self.prop1Entry.bind("<FocusOut>", self.handle_updateProp1)
         # Names for the filter property 2
-        self.prop2Names = ["", "", "", "", "Upper frequency", "Upper frequency", "", "", "", "", ""]
+        self.prop2Names = ["", "", "", "", "Upper frequency", "Upper frequency", "", "", "", "", "", ""]
         # Visibility of filter property 2
-        self.prop2Visible = [False, False, False, False, True, True, False, False, False, False, False]
+        self.prop2Visible = [False, False, False, False, True, True, False, False, False, False, False, False]
         # Create label for the filter property 2 entry box
         self.prop2Label = Label(master=self.filterFrame, text=self.prop2Names[filterDefIndex])
         self.uiElements.append(self.prop2Label)
         self.uiGridParams.append([2, 0, 1, 1, "E"])
         # Value type for the filter property 2
-        self.prop2Type = ["", "", "", "", "Float", "Float", "", "", "", "", ""]
+        self.prop2Type = ["", "", "", "", "Float", "Float", "", "", "", "", "", ""]
         # Default values for the filter property 2 (later current values)
-        self.prop2Value = [None, None, None, None, 0.0, 0.0, None, None, None, None, None]
+        self.prop2Value = [None, None, None, None, 0.0, 0.0, None, None, None, None, None, None, None]
         # Minimum values for the filter property 1
-        self.prop2Min = [None, None, None, None, 0.0, 0.0, None, None, None, None, None]
+        self.prop2Min = [None, None, None, None, 0.0, 0.0, None, None, None, None, None, None, None]
         # Maximum values for the filter property 1
-        self.prop2Max = [None, None, None, None, np.inf, np.inf, None, None, None, None, None]
+        self.prop2Max = [None, None, None, None, np.inf, np.inf, None, None, None, None, None, None]
         # Variable to control content of the filter property 2 entry box
         self.prop2V = StringVar()
         self.prop2V.set(str(self.prop2Value[self.filters.index(self.filterDefault)]))
@@ -554,21 +555,21 @@ class DSMVGUI:
         self.prop2Entry.bind("<KP_Enter>", self.handle_updateProp2)
         self.prop2Entry.bind("<FocusOut>", self.handle_updateProp2)
 		# Names for the filter property 3
-        self.prop3Names = ["", "", "", "", "Filter order", "Filter order", "Filter order", "Filter order", "", "", ""]
+        self.prop3Names = ["", "", "", "", "Filter order", "Filter order", "Filter order", "Filter order", "", "", "", ""]
         # Visibility of filter property 3
-        self.prop3Visible = [False, False, False, False, True, True, True, True, False, False, False]
+        self.prop3Visible = [False, False, False, False, True, True, True, True, False, False, False, False]
         # Create label for the filter property 3 entry box
         self.prop3Label = Label(master=self.filterFrame, text=self.prop3Names[filterDefIndex])
         self.uiElements.append(self.prop3Label)
         self.uiGridParams.append([3, 0, 1, 1, "E"])
         # Value type for the filter property 3
-        self.prop3Type = ["", "", "", "", "Integer", "Integer", "Integer", "Integer", "", "", ""]
+        self.prop3Type = ["", "", "", "", "Integer", "Integer", "Integer", "Integer", "", "", "", ""]
         # Default values for the filter property 3 (later current values)
-        self.prop3Value = [None, None, None, None, 2, 2, 2, 2, None, None, None]
+        self.prop3Value = [None, None, None, None, 2, 2, 2, 2, None, None, None, None]
         # Minimum values for the filter property 3
-        self.prop3Min = [None, None, None, None, 2, 2, 2, 2, None, None, None]
+        self.prop3Min = [None, None, None, None, 2, 2, 2, 2, None, None, None, None]
         # Maximum values for the filter property 3
-        self.prop3Max = [None, None, None, None, 140, 140, 140, 140, None, None, None]
+        self.prop3Max = [None, None, None, None, 140, 140, 140, 140, None, None, None, None]
         # Variable to control content of the filter property 3 entry box
         self.prop3V = StringVar()
         self.prop3V.set(str(self.prop3Value[filterDefIndex]))
@@ -580,21 +581,21 @@ class DSMVGUI:
         self.prop3Entry.bind("<KP_Enter>", self.handle_updateProp3)
         self.prop3Entry.bind("<FocusOut>", self.handle_updateProp3)
         # Names for the filter property 4
-        self.prop4Names = ["", "", "", "", "Filter Window", "Filter Window", "Filter Window", "Filter Window", "", "", ""]
+        self.prop4Names = ["", "", "", "", "Filter Window", "Filter Window", "Filter Window", "Filter Window", "", "", "", ""]
         # Visibility of filter property 4
-        self.prop4Visible = [False, False, False, False, True, True, True, True, False, False, False]
+        self.prop4Visible = [False, False, False, False, True, True, True, True, False, False, False, False]
         # Create label for the filter property 4 combo box
         self.prop4Label = Label(master=self.filterFrame, text=self.prop4Names[filterDefIndex])
         self.uiElements.append(self.prop4Label)
         self.uiGridParams.append([4, 0, 1, 1, "E"])
         # Value type for the filter property 4
-        self.prop4Type = ["", "", "", "", "String", "String", "String", "String", "", "", ""]
+        self.prop4Type = ["", "", "", "", "String", "String", "String", "String", "", "", "", ""]
         # Default values for the filter property 4 (later current values)
-        self.prop4Value = [None, None, None, None, "Rectangle", "Rectangle", "Rectangle", "Rectangle", None, None, None]
+        self.prop4Value = [None, None, None, None, "Rectangle", "Rectangle", "Rectangle", "Rectangle", None, None, None, None]
         # Minimum values for the filter property 4
-        self.prop4Min = [None, None, None, None, None, None, None, None, None, None, None]
+        self.prop4Min = [None, None, None, None, None, None, None, None, None, None, None, None]
         # Maximum values for the filter property 4
-        self.prop4Max = [None, None, None, None, None, None, None, None, None, None, None]
+        self.prop4Max = [None, None, None, None, None, None, None, None, None, None, None, None]
         # Variable to control content of the filter property 4 entry box
         self.prop4V = StringVar()
         self.prop4V.set(str(self.prop4Value[filterDefIndex]))
@@ -609,21 +610,21 @@ class DSMVGUI:
         
         
         # Names for the filter property 5
-        self.prop5Names = ["", "", "", "", "Arithmetic", "Arithmetic", "Arithmetic", "Arithmetic", "", "", ""]
+        self.prop5Names = ["", "", "", "", "Arithmetic", "Arithmetic", "Arithmetic", "Arithmetic", "", "", "", ""]
         # Visibility of filter property 5
-        self.prop5Visible = [False, False, False, False, True, True, True, True, False, False, False]
+        self.prop5Visible = [False, False, False, False, True, True, True, True, False, False, False, False]
         # Create label for the filter property 5 combo box
         self.prop5Label = Label(master=self.filterFrame, text=self.prop5Names[filterDefIndex])
         self.uiElements.append(self.prop5Label)
         self.uiGridParams.append([5, 0, 1, 1, "E"])
         # Value type for the filter property 5
-        self.prop5Type = ["", "", "", "", "String", "String", "String", "String", "", "", ""]
+        self.prop5Type = ["", "", "", "", "String", "String", "String", "String", "", "", "", ""]
         # Default values for the filter property 5 (later current values)
-        self.prop5Value = [None, None, None, None, "Integer double buffer", "Integer double buffer", "Integer double buffer", "Integer double buffer", None, None, None]
+        self.prop5Value = [None, None, None, None, "Integer double buffer", "Integer double buffer", "Integer double buffer", "Integer double buffer", None, None, None, None]
         # Minimum values for the filter property 5
-        self.prop5Min = [None, None, None, None, None, None, None, None, None, None, None]
+        self.prop5Min = [None, None, None, None, None, None, None, None, None, None, None, None]
         # Maximum values for the filter property 5
-        self.prop5Max = [None, None, None, None, None, None, None, None, None, None, None]
+        self.prop5Max = [None, None, None, None, None, None, None, None, None, None, None, None]
         # Variable to control content of the filter property 5 entry box
         self.prop5V = StringVar()
         self.prop5V.set(str(self.prop5Value[filterDefIndex]))
@@ -662,9 +663,9 @@ class DSMVGUI:
         self.uiGridParams.append([0, 2, 1, 1, "W"])
         self.modelHsButton.bind("<Button-1>", self.handle_modelHs)
         # Array to store wether there is a H(z) to display for the respective filter
-        self.hzEnabled = [True, True, True, True, True, True, True, True, True, True, False]
+        self.hzEnabled = [True, True, True, True, True, True, True, True, True, True, False, False]
         # Array to store wether there is a H(s) to display for the respective filter
-        self.hsEnabled = [True, True, True, True, False, False, False, False, True, True, False]
+        self.hsEnabled = [True, True, True, True, False, False, False, False, True, True, False, False]
         # create frame for the run control
         self.runFrame = Frame(master=self.controlFrame, relief=RIDGE, borderwidth=2)
         self.uiElements.append(self.runFrame)
@@ -783,7 +784,7 @@ class DSMVGUI:
         self.freqs1 = int(np.ceil((self.dataSize+1)/2))
         self.freqs2 = int(np.ceil((self.dataSize+1)/2))
         # Default indices of the amplitude response to norm on
-        self.normIndexDefault = [0, 0, 0, self.freqs1-2, -1, 0, 0, self.freqs1-2, 0, 0, None]
+        self.normIndexDefault = [0, 0, 0, self.freqs1-2, -1, 0, 0, self.freqs1-2, 0, 0, None, 0]
         # Index of the amplitude response to norm on
         self.normIndex = self.normIndexDefault
         # Create values for frequency axis
@@ -1319,7 +1320,7 @@ class DSMVGUI:
         self.phase1.set_xdata(self.f1)
         self.phase2.set_xdata(self.f2)
         middle = int(self.freqs1 * (self.prop1Value[4] + self.prop2Value[4]) / self.samplerate) - 1
-        self.normIndex = [0, 0, 0, self.freqs1-2, middle, 0, 0, self.freqs1-2, 0, 0, None]
+        self.normIndex = [0, 0, 0, self.freqs1-2, middle, 0, 0, self.freqs1-2, 0, 0, None, 0]
         if self.spectral:
             self.transferModel.set_xdata(self.f1[1:len(self.f1)])
             self.phaseModel.set_xdata(self.f1[1:len(self.f1)])
