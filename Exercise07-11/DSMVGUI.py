@@ -784,7 +784,7 @@ class DSMVGUI:
         self.freqs1 = int(np.ceil((self.dataSize+1)/2))
         self.freqs2 = int(np.ceil((self.dataSize+1)/2))
         # Default indices of the amplitude response to norm on
-        self.normIndexDefault = [0, 0, 0, self.freqs1-2, -1, 0, 0, self.freqs1-2, 0, 0, None, 0]
+        self.normIndexDefault = [0, 0, 0, self.freqs1-2, -1, 0, 0, self.freqs1-2, 0, 0, None, -self.freqs1-2]
         # Index of the amplitude response to norm on
         self.normIndex = self.normIndexDefault
         # Create values for frequency axis
@@ -1320,7 +1320,7 @@ class DSMVGUI:
         self.phase1.set_xdata(self.f1)
         self.phase2.set_xdata(self.f2)
         middle = int(self.freqs1 * (self.prop1Value[4] + self.prop2Value[4]) / self.samplerate) - 1
-        self.normIndex = [0, 0, 0, self.freqs1-2, middle, 0, 0, self.freqs1-2, 0, 0, None, 0]
+        self.normIndex = [0, 0, 0, self.freqs1-2, middle, 0, 0, self.freqs1-2, 0, 0, None, self.freqs1-2]
         if self.spectral:
             self.transferModel.set_xdata(self.f1[1:len(self.f1)])
             self.phaseModel.set_xdata(self.f1[1:len(self.f1)])
