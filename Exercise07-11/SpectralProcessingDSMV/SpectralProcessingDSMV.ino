@@ -7,10 +7,11 @@
  *  
  *  @author Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
  *  @author Philipp Rahe (prahe@uos.de)
- *  @date 28.06.2022
+ *  @date 19.06.2023
  *  @version 1.9
  *  
  *  @par Changelog
+ *  - 19.06.2023: Added ownDef. Set as default on startup.
  *  - 28.06.2022: Fixed a bug that caused the IIR-Filter to not use the most recent values correctly
  *  - 27.06.2022: Changed arithmetic to the format of a filter property
  *  - 21.06.2022: Fixed a bug that caused the updated arithmetic to only be applied to the current filter,
@@ -38,7 +39,7 @@
  *  - 05.06.2021: initial version
  * 
  *  @copyright 
- *  Copyright 2022 Lukas Freudenberg, Philipp Rahe 
+ *  Copyright 2023 Lukas Freudenberg, Philipp Rahe 
  * 
  *  @par License
  *  @parblock
@@ -104,7 +105,7 @@ bool blinker = false; /**< Specifies usage of LED_1. true: 1s interval (Note: Th
 int mode = spectral;  /**< Operation mode. */
 
 #define defaultSamplerate 20000     /**< Default value for sampling frequency for specral analysis. */
-#define defaultProcessingRate 5000  /**< Default value for frequency for reading the LTC2500, processing the data and output at the AD5791. */
+#define defaultProcessingRate 10000  /**< Default value for frequency for reading the LTC2500, processing the data and output at the AD5791. */
 
 const int numFilters = 12;  /**< Number of filters. */
 const int numProps = 6;     /**< Number of properties per filter. */
@@ -165,7 +166,7 @@ float filterProperties[numFilters][numProps] = {
   defaultOwnDef
 };
 
-int filter = progIIR;   /**< Currently selected filter. */
+int filter = ownDef;   /**< Currently selected filter. */
 float scalingGain = 1;  /**< Scaling gain for all filters. */
 
 const uint32_t maxLen = 4*32768;              /**< Maximum length of the data buffers in bytes. */
@@ -207,9 +208,13 @@ void setup() {
   T4interSetup(GPT2, 1 / samplerate);     // Set the interval for the output interrupt
 
   /*****************************
-   * Set default filter to ownDef (Exercise 8.B)
+   * Set default filter to ownDef (Exercise 8.D)
    */
   filter = ownDef;
+  for(int i=0; i < numFilters; i++) {
+    filterProperties[i][5] = processingRate;
+  }
+  init_fir(filter, filterProperties[filter]);
 
   /******************************
    * Finalise setup */
@@ -314,6 +319,7 @@ int nmax = bufLen / 2;
  */
 void readProcessOutput() {
   //T4toggle(LED_3);
+  //T4dw(LED_3, true);
   // Possibly read
   if(mode != spectral) {
     spectralRead();
@@ -399,6 +405,7 @@ void readProcessOutput() {
     }
   }
   //T4toggle(LED_3);
+  //T4dw(LED_3, false);
 }
 
 /** @brief Resets the history values for the high- and low-pass filter.
