@@ -337,7 +337,7 @@ void readProcessOutput() {
   float outputValue = voltageLTC2500;
   
   // Trigger timing LED to measure filter performance
-  //T4toggle(LED_3);
+  T4toggle(LED_3);
   /***** Processing of input data */
   switch(filter) {
     case scaling:   outputValue = proc_scale(outputValue, filterProperties[filter]);
@@ -365,7 +365,7 @@ void readProcessOutput() {
     case ownDef:    outputValue = proc_ownDef(outputValue, filterProperties[filter]);
                     break;
   }
-  //T4toggle(LED_3);
+  T4toggle(LED_3);
 
   // Apply scaling gain if not done already
   if(filter != scaling) {outputValue *= scalingGain;}
