@@ -1,25 +1,13 @@
-# SpectralGUI includes a GUI for the spectral analysis of the oscilloscope functionality of the DSMV board
+# LockInGUI includes a GUI for the lock-in functionality of the DSMV board
 #
-# Requires the Arduino sketch DisplayDSMVGenerate.ino loaded on the Teensy 4.0.
-# 
-# There are two spectra being displayed,
-# one for each of the selectable filter windows.
-# The filter windows can be added externally with the following
-# convention:
-# File name:
-#   Window[Name of the window].py, eg. WindowBlackman.py
-# Inputs:
-#   N: length of the window
-# Returns:
-#   window: the window as a vector
-#   enbw: the enbw of the window (given by the sum of the squared
-#   values divided by the square of the sum of all values)
+# Requires the Arduino sketch LockIn.ino loaded on the Teensy 4.0.
 # 
 # Lukas Freudenberg (lfreudenberg@uni-osnabrueck.de)
 # philipp Rahe (prahe@uni-osnabrueck.de)
-# 04.07.2022, ver1.4
+# 10.07.2023, ver1.5
 # 
 # Changelog:
+#   - 10.07.2023: File can directly be executed; save Button stores all figures;
 #   - 04.07.2022: UI appearance changes,
 #                 added option to use Lock-In as one phase only,
 #                 added legends to display average and standard deviation for time series of R and phi,
@@ -106,7 +94,7 @@ class LockInGUI:
         # List with the grid parameters of all UI elements
         self.uiGridParams = []
         # create label for version number
-        self.vLabel = Label(master=self.window, text="DSMV\nEx. 12\nv1.4")
+        self.vLabel = Label(master=self.window, text="DSMV\nEx. 11\nv1.5")
         self.uiElements.append(self.vLabel)
         self.uiGridParams.append([0, 0, 1, 1, "NS"])
         # create frame for controls
@@ -423,15 +411,28 @@ class LockInGUI:
         self.uiElements.append(self.saveLabel0)
         self.uiGridParams.append([1, 0, 1, 1, ""])
         def updateSaveLabel0(event):
-            path = L.savePath("Polar Plot", self.dir)
-            # save the image
-            self.fig0.savefig(path + ".svg")
-            # save the data as csv file
-            L.saveFigCSV(self.fig0, path)
-            # display the saved message
-            self.saveLabel0.configure(text="Saved as " + path + "!")
-            # schedule message removal
-            self.window.after(2000, lambda: self.saveLabel0.configure(text=""))
+            path = L.savePath("DSMV_data", self.dir)
+            # save the images
+            self.fig0.savefig(path + "polar.svg")
+            self.fig0.savefig(path + "polar.png")
+            self.fig1.savefig(path + "R.svg")
+            self.fig1.savefig(path + "R.png")
+            self.fig2.savefig(path + "phi.svg")
+            self.fig2.savefig(path + "phi.png")
+            # save the R and phi data as csv file
+            outarr = []
+            outarr = np.asarray([self.x, self.data[0], self.data[1]])
+            outarr = outarr.transpose()
+            np.savetxt(path + ".csv", outarr, delimiter=",")
+            # set label
+            self.saveLabel0.configure(text="Last file:\n " + path)
+            #
+            ## OLD
+            #L.saveFigCSV(self.fig0, path)
+            ## display the saved message
+            #self.saveLabel0.configure(text="Saved as " + path + "!")
+            ## schedule message removal
+            #self.window.after(2000, lambda: self.saveLabel0.configure(text=""))
         self.saveButton0.bind("<Button-1>", updateSaveLabel0)
         toolbar0 = L.VerticalPlotToolbar(canvas0, self.saveFrame0)
         toolbar0.update()
@@ -463,26 +464,26 @@ class LockInGUI:
         # Create frame for saving the plot
         self.saveFrame1 = Frame()
         self.uiElements.append(self.saveFrame1)
-        self.uiGridParams.append([2, 2, 1, 1, "NS"])
-        # Create save button
-        self.saveButton1 = Button(master=self.saveFrame1, text=u"\U0001F4BE", font=("TkDefaultFont", 60))
-        self.uiElements.append(self.saveButton1)
-        self.uiGridParams.append([0, 0, 1, 1, ""])
-        # Create label to display saved message
-        self.saveLabel1 = Label(master=self.saveFrame1)
-        self.uiElements.append(self.saveLabel1)
-        self.uiGridParams.append([1, 0, 1, 1, ""])
-        def updateSaveLabel1(event):
-            path = L.savePath("Time Series", self.dir)
-            # save the image
-            self.fig1.savefig(path + ".svg")
-            # save the data as csv file
-            L.savePlotCSV(self.R, path)
-            # display the saved message
-            self.saveLabel1.configure(text="Saved as " + path + "!")
-            # schedule message removal
-            self.window.after(2000, lambda: self.saveLabel1.configure(text=""))
-        self.saveButton1.bind("<Button-1>", updateSaveLabel1)
+        self.uiGridParams.append([2, 2, 1, 1, "NW"])
+        ## Create save button
+        #self.saveButton1 = Button(master=self.saveFrame1, text=u"\U0001F4BE", font=("TkDefaultFont", 60))
+        #self.uiElements.append(self.saveButton1)
+        #self.uiGridParams.append([0, 0, 1, 1, ""])
+        ## Create label to display saved message
+        #self.saveLabel1 = Label(master=self.saveFrame1)
+        #self.uiElements.append(self.saveLabel1)
+        #self.uiGridParams.append([1, 0, 1, 1, ""])
+        #def updateSaveLabel1(event):
+        #    path = L.savePath("Time Series", self.dir)
+        #    # save the image
+        #    self.fig1.savefig(path + ".svg")
+        #    # save the data as csv file
+        #    L.savePlotCSV(self.R, path)
+        #    # display the saved message
+        #    self.saveLabel1.configure(text="Saved as " + path + "!")
+        #    # schedule message removal
+        #    self.window.after(2000, lambda: self.saveLabel1.configure(text=""))
+        #self.saveButton1.bind("<Button-1>", updateSaveLabel1)
         toolbar1 = L.VerticalPlotToolbar(canvas1, self.saveFrame1)
         toolbar1.update()
         toolbar1.pack_forget()
@@ -511,26 +512,26 @@ class LockInGUI:
         # Create frame for saving the plot
         self.saveFrame2 = Frame()
         self.uiElements.append(self.saveFrame2)
-        self.uiGridParams.append([3, 2, 1, 1, "NS"])
-        # Create save button
-        self.saveButton2 = Button(master=self.saveFrame2, text=u"\U0001F4BE", font=("TkDefaultFont", 60))
-        self.uiElements.append(self.saveButton2)
-        self.uiGridParams.append([0, 0, 1, 1, ""])
-        # Create label to display saved message
-        self.saveLabel2 = Label(master=self.saveFrame2)
-        self.uiElements.append(self.saveLabel2)
-        self.uiGridParams.append([1, 0, 1, 1, ""])
-        def updateSaveLabel2(event):
-            path = L.savePath("Spectrum", self.dir)
-            # save the image
-            self.fig2.savefig(path + ".svg")
-            # save the data of spectra as csv file
-            L.saveFigCSV(self.fig2, path)
-            # display the saved message
-            self.saveLabel2.configure(text="Saved as " + path + "!")
-            # schedule message removal
-            self.window.after(2000, lambda: self.saveLabel2.configure(text=""))
-        self.saveButton2.bind("<Button-1>", updateSaveLabel2)
+        self.uiGridParams.append([3, 2, 1, 1, "NW"])
+        ## Create save button
+        #self.saveButton2 = Button(master=self.saveFrame2, text=u"\U0001F4BE", font=("TkDefaultFont", 60))
+        #self.uiElements.append(self.saveButton2)
+        #self.uiGridParams.append([0, 0, 1, 1, ""])
+        ## Create label to display saved message
+        #self.saveLabel2 = Label(master=self.saveFrame2)
+        #self.uiElements.append(self.saveLabel2)
+        #self.uiGridParams.append([1, 0, 1, 1, ""])
+        #def updateSaveLabel2(event):
+        #    path = L.savePath("Spectrum", self.dir)
+        #    # save the image
+        #    self.fig2.savefig(path + ".svg")
+        #    # save the data of spectra as csv file
+        #    L.saveFigCSV(self.fig2, path)
+        #    # display the saved message
+        #    self.saveLabel2.configure(text="Saved as " + path + "!")
+        #    # schedule message removal
+        #    self.window.after(2000, lambda: self.saveLabel2.configure(text=""))
+        #self.saveButton2.bind("<Button-1>", updateSaveLabel2)
         toolbar2 = L.VerticalPlotToolbar(canvas2, self.saveFrame2)
         toolbar2.update()
         toolbar2.pack_forget()
@@ -1116,8 +1117,8 @@ class LockInGUI:
             self.R.set_ydata(self.data[0])
             self.phi.set_ydata(self.data[1])
             self.circle.set_ydata([R] * self.circleLen)
-            self.dPoint.set_xdata(phi)
-            self.dPoint.set_ydata(R)
+            self.dPoint.set_xdata([phi])
+            self.dPoint.set_ydata([R])
             self.dLine.set_xdata([phi, phi])
             self.dLine.set_ydata([0, R])
             phiStr = ""
@@ -1153,3 +1154,7 @@ class LockInGUI:
     # Callback for the stop button
     def stop(self, event):
         self.window.destroy()
+
+
+if __name__ == "__main__":
+    gui = LockInGUI()
